@@ -7,7 +7,7 @@ is deliberately not asserted, so it can be reworded or translated without
 breaking a port.
 
 This exists so a port to another language is a weekend rather than a rewrite.
-`fallaxio/mailgrade` is the TypeScript implementation; a port reads these same
+`FallaxIO/mailgrade` is the TypeScript implementation; a port reads these same
 files, writes one adapter that maps a `target` to its own function, and is
 finished when all of them pass.
 

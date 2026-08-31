@@ -16,12 +16,12 @@
   ],
   "license": "MIT",
   "author": "Fallax",
-  "homepage": "https://github.com/fallaxio/mailgrade#readme",
+  "homepage": "https://github.com/FallaxIO/mailgrade#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/fallaxio/mailgrade.git"
+    "url": "git+https://github.com/FallaxIO/mailgrade.git"
   },
-  "bugs": "https://github.com/fallaxio/mailgrade/issues",
+  "bugs": "https://github.com/FallaxIO/mailgrade/issues",
   "type": "module",
   "sideEffects": false,
   "engines": {
