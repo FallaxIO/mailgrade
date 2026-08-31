@@ -1,6 +1,6 @@
 {
   "name": "mailgrade",
-  "version": "0.2.0",
+  "version": "1.0.0",
   "description": "Grade a domain's SPF, DMARC and DKIM. Zero dependencies, no network, runs anywhere.",
   "keywords": [
     "dmarc",
