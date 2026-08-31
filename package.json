@@ -85,6 +85,16 @@
         "default": "./dist/headers/index.cjs"
       }
     },
+    "./verify": {
+      "import": {
+        "types": "./dist/verify/index.d.ts",
+        "default": "./dist/verify/index.js"
+      },
+      "require": {
+        "types": "./dist/verify/index.d.cts",
+        "default": "./dist/verify/index.cjs"
+      }
+    },
     "./domain": {
       "import": {
         "types": "./dist/domain.d.ts",
@@ -103,6 +113,16 @@
       "require": {
         "types": "./dist/doh.d.cts",
         "default": "./dist/doh.cjs"
+      }
+    },
+    "./node-dns": {
+      "import": {
+        "types": "./dist/node-dns.d.ts",
+        "default": "./dist/node-dns.js"
+      },
+      "require": {
+        "types": "./dist/node-dns.d.cts",
+        "default": "./dist/node-dns.cjs"
       }
     },
     "./spec/*": "./spec/*",

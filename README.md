@@ -1,54 +1,28 @@
-<h1 align="center">mailgrade</h1>
-
 <p align="center">
-  <strong>Grade a domain's SPF, DMARC and DKIM.</strong><br>
-  Zero dependencies. No network in the core. Runs in Node, Bun, Deno, Workers and the browser.
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="./.github/assets/banner-dark.svg">
+    <img alt="mailgrade: grade a domain's SPF, DMARC and DKIM. Zero dependencies, no network in the core, runs anywhere." src="./.github/assets/banner-light.svg" width="860">
+  </picture>
 </p>
 
 <p align="center">
-  <a href="https://www.npmjs.com/package/mailgrade"><img alt="npm" src="https://img.shields.io/npm/v/mailgrade?color=%230b7285&label=npm"></a>
-  <a href="https://bundlephobia.com/package/mailgrade"><img alt="size" src="https://img.shields.io/bundlephobia/minzip/mailgrade?color=%230b7285&label=min%2Bgzip"></a>
-  <a href="./LICENSE"><img alt="license" src="https://img.shields.io/npm/l/mailgrade?color=%230b7285"></a>
+  <a href="https://www.npmjs.com/package/mailgrade"><img alt="npm" src="https://img.shields.io/npm/v/mailgrade?color=%23008F73&label=npm"></a>
+  <a href="https://bundlephobia.com/package/mailgrade"><img alt="size" src="https://img.shields.io/bundlephobia/minzip/mailgrade?color=%23008F73&label=min%2Bgzip"></a>
+  <a href="./LICENSE"><img alt="license" src="https://img.shields.io/npm/l/mailgrade?color=%23008F73"></a>
 </p>
 
----
+<p align="center">
+  Grade and verify SPF, DKIM and DMARC.<br>
+  Zero dependencies. Runs wherever <code>fetch</code> and WebCrypto do: Node, Bun, Deno, Cloudflare Workers, browsers.
+</p>
 
-`mailgrade` answers one question: **how far does mail claiming to be this domain
-actually get?**
-
-That is not the same question as "did this message pass". Nothing here does
-cryptography or opens a socket. It reads what a domain publishes, or what a
-receiving server wrote into a header block, and grades it the way a receiver
-would act on it. A syntactically perfect `p=none` record is valid DMARC and
-protects nothing, and `mailgrade` says so.
-
-```ts
-import { checkDomain } from "mailgrade/doh";
-
-const grade = await checkDomain("example.com");
-
-grade.verdict;            // "spoofable"
-grade.dmarc.id;           // "dmarc-monitor"
-grade.dmarc.headline;     // "DMARC is monitoring only (p=none)"
-grade.recommendations[0]; // { id: "graduate-dmarc", text: "Graduate DMARC from p=none. ..." }
-```
-
-## Is this what you want?
-
-| | `mailgrade` | [`mailauth`](https://github.com/postalsys/mailauth) | [`checkdmarc`](https://github.com/domainaware/checkdmarc) |
-| --- | --- | --- | --- |
-| Answers | is this domain forgeable | did **this message** pass | is this record valid |
-| Verifies signatures | no | yes | no |
-| Runtime deps | **0** | 10 | Python |
-| Runs in a Worker or a browser | **yes** | no | no |
-| Ships explanations and fixes | **yes** | no | no |
-
-If you need to verify a message you have in hand, use `mailauth`. It is the
-right tool and this is not a replacement for it. Use `mailgrade` to grade a
-domain's configuration, to build a checker, or to read a header block that
-somebody pasted.
-
-## Install
+<p align="center">
+  <a href="#grade-a-domain">Grade a domain</a> &nbsp;&middot;&nbsp;
+  <a href="#verify-a-message">Verify a message</a> &nbsp;&middot;&nbsp;
+  <a href="#triage-pasted-headers">Triage headers</a> &nbsp;&middot;&nbsp;
+  <a href="#dmarc-records">DMARC records</a> &nbsp;&middot;&nbsp;
+  <a href="#compared">Compared</a>
+</p>
 
 ```sh
 npm i mailgrade
@@ -56,136 +30,184 @@ npm i mailgrade
 
 ## Grade a domain
 
-The core is pure, so DNS is yours to do. If you want it done for you, the
-optional `mailgrade/doh` entry point resolves over DNS-over-HTTPS with nothing
-but `fetch`:
+Is this domain spoofable, and what is the fix?
 
 ```ts
 import { checkDomain } from "mailgrade/doh";
 
 const grade = await checkDomain("acme.com");
-//    ^ verdict, spf, dmarc, dkim, mx, recommendations
+
+grade.verdict;            // "spoofable" | "partial" | "protected"
+grade.dmarc.headline;     // "DMARC is monitoring only (p=none)"
+grade.recommendations[0]; // { id: "graduate-dmarc", text: "Graduate DMARC from p=none. ..." }
 ```
 
-Already have the records? Skip the network entirely:
+DNS goes over DNS-over-HTTPS by default, against Cloudflare. Swap it:
+
+| To resolve with | Pass |
+| --- | --- |
+| Another DoH provider | `{ endpoint }` |
+| The system resolver | `{ resolver: nodeResolver() }` from `mailgrade/node-dns` |
+| Anything else | `{ resolver }`, any `(name, type) => Promise<string[]>` |
+| Nothing at all | `gradeDomain({ domain, txt, dmarc, ... })`, records you already hold |
+
+> [!NOTE]
+> One `checkDomain` is about 21 lookups: three records, plus a probe per DKIM
+> selector. Public DoH endpoints publish no rate limit and throttle bulk
+> traffic from one IP at their discretion, so for volume trim `selectors`,
+> lower `concurrency`, or resolve through `mailgrade/node-dns`. An HTTP 429
+> arrives as `DnsError`; backoff is yours to add.
+
+## Verify a message
+
+For when you are the receiver: a Workers email handler, an inbound webhook, an
+SMTP server.
 
 ```ts
-import { gradeDomain } from "mailgrade";
+import { verifyMessage, toAuthResults } from "mailgrade/verify";
+import { dohResolver } from "mailgrade/doh";
 
-const grade = gradeDomain({
-  domain: "acme.com",
-  txt: ["v=spf1 include:_spf.google.com ~all"],
-  dmarc: ["v=DMARC1; p=none; rua=mailto:dmarc@acme.com"],
-  dkimSelectors: ["google"],
-  mx: ["aspmx.l.google.com"],
+const result = await verifyMessage(rawMessage, {
+  resolver: dohResolver(),
+  ip: "203.0.113.50",           // who connected
+  sender: "bounce@example.com", // MAIL FROM
 });
 
-grade.verdict; // "spoofable"
+result.dmarc?.result;      // "pass" | "fail" | "none"
+result.dmarc?.disposition; // "none" | "quarantine" | "reject"
+
+toAuthResults(result, "mx.acme.com");
+// "mx.acme.com; spf=pass smtp.mailfrom=bounce@example.com; dkim=pass header.d=..."
 ```
 
-The verdict is one of `protected`, `partial` or `spoofable`. DMARC policy
-decides it, because DMARC is the tag receivers act on. SPF and DKIM decide
-whether that policy has anything to align against, with one exception:
-`+all` defeats even `p=reject`, because the forger's server is then genuinely
-authorised and passes SPF honestly.
+SPF is evaluated against the connecting IP (RFC 7208, macros and lookup limits
+included), DKIM signatures are verified with WebCrypto (rsa-sha256 and
+ed25519-sha256; rsa-sha1 and sub-1024-bit keys refused per RFC 8301), and DMARC
+alignment ties them to the From domain. `verifySpf`, `verifyDkim` and
+`verifyDmarc` are also standalone calls. A DNS failure is always a `temperror`,
+never a `fail`. In tests, `staticResolver({ "example.com": { TXT: [...] } })`
+evaluates against a plain object.
 
-## Write and review a DMARC record
+> [!IMPORTANT]
+> Where a verdict decides whether mail is delivered, pass `{ publicSuffixes }`
+> too. The built-in list is an approximation, and it under-reports alignment
+> rather than over-reporting it. [Why](#alignment-and-the-public-suffix-list).
+
+## Triage pasted headers
+
+For "is this email real": no cryptography, no I/O. A pasted header block
+carries private data and never leaves the process.
+
+```ts
+import { analyzeHeaders } from "mailgrade/headers";
+
+const result = analyzeHeaders(paste);
+
+result.verdict;     // "suspicious" | "inconclusive" | "authentic"
+result.spf.aligned; // false, the pass was for somebody else's domain
+result.flags.map((f) => f.id);
+// ["dmarc-fail", "reply-to-mismatch", "return-path-mismatch", "php-origin"]
+```
+
+Reads the verdicts the receiving server recorded, adds alignment, and flags
+display-name tricks, lookalike domains, punycode, hidden characters and
+redirected replies.
+
+## DMARC records
 
 ```ts
 import { buildDmarcRecord, reviewDmarc, rolloutPlan } from "mailgrade/dmarc";
 
 const options = {
-  domain: "acme.com",
-  policy: "reject",
-  subdomainPolicy: "none",
-  rua: ["dmarc@acme.com"],
-  ruf: [], pct: 100, adkim: "r", aspf: "r", ri: 86400, fo: "0",
+  domain: "acme.com", policy: "reject", subdomainPolicy: "none",
+  rua: ["dmarc@acme.com"], ruf: [], pct: 100,
+  adkim: "r", aspf: "r", ri: 86400, fo: "0",
 } as const;
 
-buildDmarcRecord(options);
-// "v=DMARC1; p=reject; sp=none; rua=mailto:dmarc@acme.com"
-
-reviewDmarc(options)[0];
-// { id: "sp-weaker", severity: "high", title: "Subdomains are the weak point", detail: "..." }
-
-rolloutPlan(options).map((s) => `${s.label}: ${s.record}`);
-// four stages from monitoring to full rejection, keeping every other choice
+buildDmarcRecord(options); // "v=DMARC1; p=reject; sp=none; rua=mailto:dmarc@acme.com"
+reviewDmarc(options)[0];   // { id: "sp-weaker", severity: "high", ... }
+rolloutPlan(options);      // four staged records, monitoring to full reject
 ```
 
-Tags whose value is already the DMARC default are left out, so the record is
-the shortest thing that says what you meant. `parseDmarcRecord` reads an
-existing one back into the same shape, forgiving what receivers forgive and
-loud about what they do not.
+## Compared
 
-## Read a message's headers
+| | `mailgrade` | [`mailauth`](https://github.com/postalsys/mailauth) | [`spf-check`](https://www.npmjs.com/package/spf-check) | [`dkim`](https://www.npmjs.com/package/dkim) |
+| --- | :-: | :-: | :-: | :-: |
+| Grade a domain, with fixes | ✓ | ✗ | ✗ | ✗ |
+| SPF, DKIM and DMARC verification | ✓ | ✓ | SPF only | DKIM only |
+| Analyze pasted headers | ✓ | ✗ | ✗ | ✗ |
+| DMARC record tooling | ✓ | ✗ | ✗ | ✗ |
+| ARC and BIMI | ✗ | ✓ | ✗ | ✗ |
+| DNS transport | DoH or `node:dns` | `node:dns` | `node:dns` | `node:dns` |
+| Workers / browsers / Deno | ✓ | ✗ | ✗ | ✗ |
+| Runtime dependencies | **0** | 10 | 4 | 2 |
+| Install size | **0.4 MB** | 15 MB | 7 MB | 1 MB |
 
-```ts
-import { analyzeHeaders } from "mailgrade/headers";
+<details>
+<summary>Full matrix, and when to use something else</summary>
 
-const result = analyzeHeaders(pastedHeaderBlock);
+<br>
 
-result.verdict;              // "suspicious"
-result.spf.result;           // "pass"
-result.spf.aligned;          // false  <- the pass was for somebody else's domain
-result.flags.map((f) => f.id);
-// ["dmarc-fail", "reply-to-mismatch", "return-path-mismatch", "php-origin"]
-```
+| | `mailgrade` | `mailauth` | `spf-check` | `dkim` |
+| --- | :-: | :-: | :-: | :-: |
+| SPF evaluation (RFC 7208) | ✓ | ✓ | ✓ | ✗ |
+| DKIM verification | ✓ | ✓ | ✗ | ✓ |
+| DMARC discovery and alignment | ✓ | ✓ | ✗ | ✗ |
+| Authentication-Results output | ✓ | ✓ | ✗ | ✗ |
+| SPF lookup limits enforced | 10 + 2 void | 10 + 2 void | 10 | n/a |
+| Bring-your-own resolver | ✓ | ✓ | ✗ | ✗ |
+| Written in TypeScript | ✓ | ✗ | ✗ | ✗ |
+| Types | generated | hand-written | ✗ | hand-written |
+| Published format | ESM + CJS | CJS | CJS | CJS |
+| Last published | current | current | 2019 | 2022 |
 
-It reads the verdicts a receiving server recorded, falling back to
-`Received-SPF` and then to ARC, and adds the part those headers leave out:
-whether the identity that authenticated is the one in the From line. On top of
-that it catches display-name tricks, bidi and zero-width characters, mixed
-scripts, punycode, brand lookalikes, redirected replies and backdating.
+Sizes are `npm install` into an empty project, measured 2026-08.
 
-No I/O, by design. Header blocks carry the recipient's address, their
-colleagues' addresses, internal hostnames and internal IPs, and a tool that
-asks a stranger to paste all of that has no business shipping it anywhere.
+**Use [`mailauth`](https://github.com/postalsys/mailauth)** for a high-volume
+Node MTA, or when you need ARC or BIMI. No ARC has a consequence worth stating
+plainly: mail that arrived through a forwarder or a mailing list has usually
+had its SPF broken and its body rewritten, so DMARC fails here exactly as it
+does at any receiver that ignores ARC. Honest for a grader, a real gap for an
+inbox.
 
-## Everything carries an id
+**Use [`parsedmarc`](https://github.com/domainaware/parsedmarc)** to parse
+DMARC aggregate reports. That is not this library's job.
 
-Every finding, note, flag and recommendation has a stable `id` beside its
-English:
-
-```ts
-{ id: "sp-weaker", severity: "high", title: "...", detail: "..." }
-```
-
-Branch on ids, not on sentences. Swap the prose for your own copy or another
-language and nothing breaks. The [conformance corpus](./spec) asserts on ids
-for the same reason.
+</details>
 
 ## Entry points
 
 | Import | What is in it |
 | --- | --- |
-| `mailgrade` | everything below except `doh` |
+| `mailgrade` | everything below except `doh` and `node-dns` |
+| `mailgrade/verify` | `verifyMessage`, `verifySpf`, `verifyDkim`, `verifyDmarc`, `toAuthResults`, `staticResolver` |
+| `mailgrade/headers` | `analyzeHeaders` and its parsers |
+| `mailgrade/dmarc` | build, parse, review and roll out a record |
 | `mailgrade/spf` | `analyzeSpf`, `isSpfRecord` |
 | `mailgrade/dkim` | `analyzeDkim`, `isDkimKey`, `dkimHost`, `DKIM_SELECTORS` |
-| `mailgrade/dmarc` | build, parse, review and roll out a record |
-| `mailgrade/headers` | `analyzeHeaders` and its parsers |
 | `mailgrade/domain` | `registrableDomain`, `aligns`, `coerceDomain` |
-| `mailgrade/doh` | `checkDomain`, `resolveDomain`, the only code that opens a socket |
+| `mailgrade/doh` | `checkDomain`, `resolveDomain`, `dohResolver`. The only code that opens a socket |
+| `mailgrade/node-dns` | `nodeResolver`. The only code that imports a Node built-in |
 
-Import one and the rest is tree-shaken away. Nothing but `mailgrade/doh`
-touches the network, so an app that resolves DNS its own way never bundles a
-resolver.
+## Notes that matter
 
-## Ports
+- **Ids are the contract.** Every finding carries a stable `id` next to its
+  English. Branch on ids; swap or translate the prose freely.
+- **The rules are portable.** They live as a language-neutral JSON corpus in
+  [`spec/`](./spec). A port passes the same files; the TypeScript adapter is
+  about 150 lines.
 
-The rules live in [`spec/`](./spec) as JSON: an input, and a projection of the
-result with ids in it and no English. A port in another language reads the same
-files and is finished when they all pass. The TypeScript adapter is 120 lines.
+<h4 id="alignment-and-the-public-suffix-list">Alignment and the public suffix list</h4>
 
-## What this is not
+Alignment needs a public suffix list, and the built-in rules are an
+approximation: known two-label suffixes, plus the registry's own labels (`co`,
+`gov`, `ac`, `org`) under any country code. They err toward reading a host as
+*more* specific than it is, so alignment is under-reported rather than
+over-reported. Pass `{ publicSuffixes }`, the ICANN section of the real list,
+to `verifyMessage`, `verifyDmarc`, `registrableDomain` or `aligns` wherever a
+wrong answer costs something.
 
-- Not a message verifier. It never checks a DKIM signature or evaluates an SPF
-  record against an IP. Use [`mailauth`](https://github.com/postalsys/mailauth).
-- Not a DMARC report parser. Use
-  [`parsedmarc`](https://github.com/domainaware/parsedmarc).
-- Not a full Public Suffix List. It ships the two-label suffixes consumer mail
-  lives under, and anything missing degrades safely: a host reads as more
-  specific than it is, so alignment is under-reported rather than over-reported.
+## About
 
-## License
-
-MIT
+Built and maintained by [Fallax](https://fallax.io), phishing simulations and
+security awareness training on autopilot. MIT licensed.

@@ -9,6 +9,7 @@ import { expect, it } from "vitest";
 import { gradeDomain } from "../src/index.ts";
 import { buildDmarcRecord, reviewDmarc, rolloutPlan } from "../src/dmarc/index.ts";
 import { analyzeHeaders } from "../src/headers/index.ts";
+import { staticResolver, verifySpf } from "../src/verify/index.ts";
 
 it("grade example", () => {
   const grade = gradeDomain({
@@ -59,4 +60,17 @@ body`;
   expect(result.flags.map((f) => f.id)).toEqual([
     "dmarc-fail", "reply-to-mismatch", "return-path-mismatch", "php-origin",
   ]);
+});
+
+it("verify example", async () => {
+  const spf = await verifySpf({
+    ip: "192.0.2.10",
+    sender: "bob@example.com",
+    resolver: staticResolver({
+      "example.com": { TXT: ["v=spf1 ip4:192.0.2.0/24 -all"] },
+    }),
+  });
+  expect(spf.result).toBe("pass");
+  expect(spf.mechanism).toBe("+ip4:192.0.2.0/24");
+  expect(spf.lookups).toBe(0);
 });

@@ -91,6 +91,36 @@
       }
     },
     {
+      "target": "registrableDomain",
+      "name": "treats an administrative second-level label as part of the suffix",
+      "input": {
+        "host": "dept.gov.uk"
+      },
+      "expect": {
+        "domain": "dept.gov.uk"
+      }
+    },
+    {
+      "target": "registrableDomain",
+      "name": "applies that rule to any country code, not a fixed list of pairs",
+      "input": {
+        "host": "cs.example.ac.jp"
+      },
+      "expect": {
+        "domain": "example.ac.jp"
+      }
+    },
+    {
+      "target": "registrableDomain",
+      "name": "leaves a registrant's own second-level label alone under a gTLD",
+      "input": {
+        "host": "mail.co.com"
+      },
+      "expect": {
+        "domain": "co.com"
+      }
+    },
+    {
       "target": "aligns",
       "name": "matches identical domains",
       "input": {
@@ -132,6 +162,28 @@
       },
       "expect": {
         "aligns": false
+      }
+    },
+    {
+      "target": "aligns",
+      "name": "does not match two registrants under an administrative suffix",
+      "input": {
+        "a": "dept.gov.uk",
+        "b": "attacker.gov.uk"
+      },
+      "expect": {
+        "aligns": false
+      }
+    },
+    {
+      "target": "aligns",
+      "name": "still matches a subdomain under an administrative suffix",
+      "input": {
+        "a": "mail.dept.gov.uk",
+        "b": "dept.gov.uk"
+      },
+      "expect": {
+        "aligns": true
       }
     },
     {

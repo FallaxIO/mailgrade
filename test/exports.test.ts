@@ -13,6 +13,8 @@ import * as headers from "../src/headers/index.ts";
 import * as spf from "../src/spf.ts";
 import * as dkim from "../src/dkim.ts";
 import * as domain from "../src/domain.ts";
+import * as verify from "../src/verify/index.ts";
+import * as nodeDns from "../src/node-dns.ts";
 
 const names = (m: object) => Object.keys(m).toSorted();
 
@@ -69,8 +71,14 @@ describe("entry points", () => {
       "reviewDmarc",
       "rolloutPlan",
       "spfCheck",
+      "staticResolver",
       "stripComments",
+      "toAuthResults",
       "txtChunks",
+      "verifyDkim",
+      "verifyDmarc",
+      "verifyMessage",
+      "verifySpf",
     ].toSorted());
   });
 
@@ -85,12 +93,28 @@ describe("entry points", () => {
     expect(names(domain)).toContain("registrableDomain");
     expect(names(dmarc)).toContain("buildDmarcRecord");
     expect(names(headers)).toContain("analyzeHeaders");
+    expect(names(verify)).toEqual([
+      "staticResolver",
+      "toAuthResults",
+      "verifyDkim",
+      "verifyDmarc",
+      "verifyMessage",
+      "verifySpf",
+    ]);
+  });
+
+  it("exposes the Node resolver only from its own entry point", () => {
+    expect(names(nodeDns)).toEqual(["nodeResolver"]);
+    for (const module of [root, spf, dkim, domain, dmarc, headers, verify]) {
+      expect(names(module)).not.toContain("nodeResolver");
+    }
   });
 
   it("keeps the network code out of every entry point but its own", () => {
-    for (const module of [root, spf, dkim, domain, dmarc, headers]) {
+    for (const module of [root, spf, dkim, domain, dmarc, headers, verify]) {
       expect(names(module)).not.toContain("checkDomain");
       expect(names(module)).not.toContain("resolveDomain");
+      expect(names(module)).not.toContain("dohResolver");
     }
   });
 });
@@ -117,14 +141,20 @@ function sources(dir: string): string[] {
   );
 }
 
+// The one file allowed to reach for a Node built-in, because importing it is
+// the whole point of it. It is its own entry point, so no bundle for a Worker
+// or a browser can reach `node:` through any other import.
+const NODE_ENTRY = "node-dns.ts";
+
 describe("runs anywhere", () => {
   // The tests are typechecked with node types in scope, so nothing at the type
   // level stops a `node:` import drifting into the library itself. This does.
-  it("imports no Node built-in anywhere in src", () => {
-    const offenders = sources(SRC).filter((file) =>
-      /from\s+["']node:/.test(readFileSync(file, "utf8")),
-    );
-    expect(offenders).toEqual([]);
+  // Static or dynamic: both forms are caught, so the exception stays explicit.
+  it("imports no Node built-in anywhere in src but the Node entry point", () => {
+    const offenders = sources(SRC)
+      .filter((file) => /["']node:/.test(readFileSync(file, "utf8")))
+      .map((file) => file.slice(SRC.length));
+    expect(offenders).toEqual([NODE_ENTRY]);
   });
 
   it("keeps the source free of characters an editor cannot show", () => {

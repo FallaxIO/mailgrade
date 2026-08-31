@@ -6,3 +6,4 @@ export * from "./headers/index.ts";
 export * from "./mx.ts";
 export * from "./spf.ts";
 export * from "./types.ts";
+export * from "./verify/index.ts";

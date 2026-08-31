@@ -29,9 +29,16 @@ const MX_PROVIDERS: readonly (readonly [pattern: string, name: string])[] = [
 ];
 
 export function mailProvider(mxHosts: readonly string[]): string | null {
-  const joined = mxHosts.join(" ").toLowerCase();
-  for (const [pattern, name] of MX_PROVIDERS) {
-    if (joined.includes(pattern)) return name;
+  for (const raw of mxHosts) {
+    const host = raw.toLowerCase().replace(/\.$/, "");
+    for (const [pattern, name] of MX_PROVIDERS) {
+      // A dotted pattern is a domain and matches as a suffix, so that
+      // "aspmx.l.google.com" names Google and "mygoogle.com.mx" does not.
+      const hit = pattern.includes(".")
+        ? host === pattern || host.endsWith(`.${pattern}`)
+        : host.includes(pattern);
+      if (hit) return name;
+    }
   }
   return null;
 }

@@ -5,6 +5,7 @@
 import { describe, expect, it } from "vitest";
 
 import { checkDomain, DnsError, resolveDomain, type FetchLike } from "../src/doh.ts";
+import { staticResolver } from "../src/verify/resolver.ts";
 
 type Zone = Record<string, { status?: number; answers?: [number, string][] }>;
 
@@ -130,6 +131,26 @@ describe("resolveDomain", () => {
     await expect(
       resolveDomain("acme.com", { selectors: [], fetch: httpFailure }),
     ).rejects.toThrow(/502/);
+  });
+});
+
+describe("bring your own DNS", () => {
+  it("routes every lookup through an injected resolver instead of DoH", async () => {
+    const grade = await checkDomain("acme.com", {
+      selectors: ["google"],
+      fetch: httpFailure, // proves fetch is never touched
+      resolver: staticResolver({
+        "acme.com": {
+          TXT: ["v=spf1 include:_spf.google.com -all"],
+          MX: ["aspmx.l.google.com"],
+        },
+        "_dmarc.acme.com": { TXT: ["v=DMARC1; p=reject"] },
+        "google._domainkey.acme.com": { TXT: ["v=DKIM1; k=rsa; p=MIIBIjANBgkq"] },
+      }),
+    });
+    expect(grade.verdict).toBe("protected");
+    expect(grade.mx.provider).toBe("Google Workspace");
+    expect(grade.dkim.selectorsFound).toEqual(["google"]);
   });
 });
 

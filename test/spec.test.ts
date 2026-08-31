@@ -34,6 +34,8 @@ import {
   parseHeaders,
   stripComments,
 } from "../src/headers/parse.ts";
+import { staticResolver } from "../src/verify/resolver.ts";
+import { verifySpf } from "../src/verify/spf.ts";
 
 type Case = {
   target: string;
@@ -166,6 +168,22 @@ const PROJECT: Record<string, (i: Record<string, any>) => unknown> = {
     const r = detectImpersonation(i["domain"]);
     return { brand: r?.brand ?? null, kind: r?.kind ?? null };
   },
+
+  verifySpf: async (i) => {
+    const r = await verifySpf({
+      ip: i["ip"],
+      sender: i["sender"],
+      helo: i["helo"],
+      resolver: staticResolver(i["zone"]),
+    });
+    return {
+      result: r.result,
+      mechanism: r.mechanism,
+      domain: r.domain,
+      lookups: r.lookups,
+      explanation: r.explanation,
+    };
+  },
 };
 
 const files = readdirSync(SPEC_DIR).filter((f) => f.endsWith(".json"));
@@ -181,12 +199,12 @@ for (const file of files) {
 
   describe(`spec/${file}`, () => {
     for (const testCase of cases) {
-      it(`${testCase.target}: ${testCase.name}`, () => {
+      it(`${testCase.target}: ${testCase.name}`, async () => {
         const project = PROJECT[testCase.target];
         expect(project, `no projection for target "${testCase.target}"`).toBeTypeOf(
           "function",
         );
-        const actual = project!(testCase.input) as Record<string, unknown>;
+        const actual = (await project!(testCase.input)) as Record<string, unknown>;
 
         for (const [key, want] of Object.entries(testCase.expect)) {
           // `hasNote` asks whether an id is present rather than pinning the

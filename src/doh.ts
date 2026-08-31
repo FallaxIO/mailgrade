@@ -3,14 +3,16 @@
  * entry point so that importing `mailgrade` never pulls it in.
  *
  * DNS over HTTPS rather than a platform resolver, because `fetch` is the one
- * lookup mechanism that exists in every runtime this targets. Node's
- * `dns/promises` works too, and wiring it up is a `resolve` function away.
+ * lookup mechanism that exists in every runtime this targets. A Node service
+ * that would rather not leave the process for every lookup passes the
+ * `resolver` from `mailgrade/node-dns` instead.
  */
 
 import { DKIM_SELECTORS, dkimHost, isDkimKey } from "./dkim.ts";
 import { dmarcHost } from "./dmarc/analyze.ts";
 import { registrableDomain } from "./domain.ts";
 import { gradeDomain, type DomainGrade, type DomainRecords } from "./grade.ts";
+import type { DnsRecordType, Resolver } from "./verify/resolver.ts";
 
 export class DnsError extends Error {
   readonly host: string;
@@ -46,11 +48,16 @@ export type DohOptions = {
   readonly signal?: AbortSignal;
   /** Lookups in flight at once. */
   readonly concurrency?: number;
+  /**
+   * Bring your own DNS: any `Resolver` replaces DoH entirely, so a Node
+   * service can grade domains over `node:dns` with the same call.
+   */
+  readonly resolver?: Resolver;
 };
 
 const DEFAULT_ENDPOINT = "https://cloudflare-dns.com/dns-query";
 
-const RECORD_TYPE = { TXT: 16, MX: 15 } as const;
+const RECORD_TYPE = { A: 1, AAAA: 28, MX: 15, PTR: 12, TXT: 16 } as const;
 
 type DohAnswer = { name: string; type: number; data: string };
 type DohResponse = { Status: number; Answer?: DohAnswer[] };
@@ -69,7 +76,7 @@ function unquoteTxt(data: string): string {
 
 async function query(
   host: string,
-  type: keyof typeof RECORD_TYPE,
+  type: DnsRecordType,
   options: DohOptions,
 ): Promise<string[]> {
   const doFetch: FetchLike = options.fetch ?? globalThis.fetch;
@@ -144,39 +151,58 @@ export async function resolveDomain(
   const name = domain.trim().toLowerCase();
   const selectors = options.selectors ?? DKIM_SELECTORS;
   const concurrency = options.concurrency ?? 10;
+  const resolve = options.resolver ?? dohResolver(options);
 
   const [txt, mx, dmarcAtDomain] = await Promise.all([
-    query(name, "TXT", options),
-    query(name, "MX", options),
-    query(dmarcHost(name), "TXT", options),
+    resolve(name, "TXT"),
+    resolve(name, "MX"),
+    resolve(dmarcHost(name), "TXT"),
   ]);
 
   let dmarc = dmarcAtDomain;
   let dmarcSource: string = name;
   const org = registrableDomain(name);
   if (dmarc.length === 0 && org && org !== name) {
-    dmarc = await query(dmarcHost(org), "TXT", options);
+    dmarc = await resolve(dmarcHost(org), "TXT");
     if (dmarc.length > 0) dmarcSource = org;
   }
 
   const hits = await pool(selectors, concurrency, async (selector) => {
-    const records = await query(dkimHost(selector, name), "TXT", options);
+    const records = await resolve(dkimHost(selector, name), "TXT");
     return records.some(isDkimKey) ? selector : null;
   });
 
   return {
     domain: name,
-    txt,
-    dmarc,
+    txt: [...txt],
+    dmarc: [...dmarc],
     dmarcSource,
     dkimSelectors: hits.filter((s): s is string => s !== null),
     dkimProbed: selectors.length,
-    mx: mx.map((record) => record.split(/\s+/).pop() ?? record).map(stripRootDot),
+    mx: mx.map((record) => stripRootDot(record.split(/\s+/).pop() ?? record)),
   };
 }
 
 function stripRootDot(host: string): string {
   return host.replace(/\.$/, "");
+}
+
+/**
+ * A `Resolver` for `mailgrade/verify`, made of nothing but `fetch`.
+ *
+ * Honours the resolver contract: empty answers come back as `[]`, failures
+ * throw (and verification reports temperror rather than fail), MX values are
+ * bare host names.
+ */
+export function dohResolver(options: DohOptions = {}): Resolver {
+  return async (name, type) => {
+    const records = await query(name, type, options);
+    if (type === "MX") {
+      return records.map((r) => stripRootDot(r.split(/\s+/).pop() ?? r));
+    }
+    if (type === "PTR") return records.map(stripRootDot);
+    return records;
+  };
 }
 
 /** Resolve a domain and grade it. */

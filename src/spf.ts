@@ -71,7 +71,9 @@ export function analyzeSpf(txtRecords: readonly string[]): SpfAnalysis {
 
   const record = records[0] as string;
   const terms = record.split(/\s+/).slice(1);
-  const allTerm = terms.findLast((t) => /^[+\-~?]?all$/i.test(t));
+  // The FIRST all decides: receivers stop at the first matching mechanism,
+  // and all always matches, so anything after it is never evaluated.
+  const allTerm = terms.find((t) => /^[+\-~?]?all$/i.test(t));
   const hasRedirect = terms.some((t) => /^redirect=/i.test(t));
 
   if (!allTerm) {

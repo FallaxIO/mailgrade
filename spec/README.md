@@ -39,6 +39,10 @@ finished when all of them pass.
   `fo=0`, subdomains inheriting).
 - `expect.hasNote` asks whether one id is present rather than pinning the whole
   list, for cases where the rest is incidental.
+- `spf-eval.json` cases carry a `zone`: a map from DNS name to its records
+  (`TXT`, `A`, `AAAA`, `MX`, `PTR`), with the string `"TEMPERROR"` standing
+  for a lookup that fails. A port evaluates against that zone and never
+  touches real DNS.
 
 ## Files
 
@@ -50,6 +54,7 @@ finished when all of them pass.
 | `dmarc-lookup.json` | grading a published DMARC record |
 | `dmarc-record.json` | building, parsing, reviewing and rolling out a record |
 | `grade.json` | the whole-domain verdict and its recommendations |
+| `spf-eval.json` | RFC 7208 evaluation: mechanisms, macros, limits, exp= |
 | `headers.json` | header parsing, authentication results, impersonation |
 
 The reference adapter is `test/spec.test.ts`, about 120 lines.

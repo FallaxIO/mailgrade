@@ -1,0 +1,191 @@
+{
+  "cases": [
+    {
+      "target": "verifySpf",
+      "name": "no record is none",
+      "input": { "ip": "192.0.2.10", "sender": "bob@example.com", "zone": {} },
+      "expect": { "result": "none" }
+    },
+    {
+      "target": "verifySpf",
+      "name": "ip4 prefix match passes",
+      "input": {
+        "ip": "192.0.2.10",
+        "sender": "bob@example.com",
+        "zone": { "example.com": { "TXT": ["v=spf1 ip4:192.0.2.0/24 -all"] } }
+      },
+      "expect": { "result": "pass", "mechanism": "+ip4:192.0.2.0/24" }
+    },
+    {
+      "target": "verifySpf",
+      "name": "outside the prefix fails on -all",
+      "input": {
+        "ip": "198.51.100.1",
+        "sender": "bob@example.com",
+        "zone": { "example.com": { "TXT": ["v=spf1 ip4:192.0.2.0/24 -all"] } }
+      },
+      "expect": { "result": "fail", "mechanism": "-all" }
+    },
+    {
+      "target": "verifySpf",
+      "name": "two records are a permerror",
+      "input": {
+        "ip": "192.0.2.10",
+        "sender": "bob@example.com",
+        "zone": { "example.com": { "TXT": ["v=spf1 -all", "v=spf1 +all"] } }
+      },
+      "expect": { "result": "permerror" }
+    },
+    {
+      "target": "verifySpf",
+      "name": "the first all wins",
+      "input": {
+        "ip": "192.0.2.10",
+        "sender": "bob@example.com",
+        "zone": { "example.com": { "TXT": ["v=spf1 ?all -all"] } }
+      },
+      "expect": { "result": "neutral", "mechanism": "?all" }
+    },
+    {
+      "target": "verifySpf",
+      "name": "include passes through",
+      "input": {
+        "ip": "192.0.2.10",
+        "sender": "bob@example.com",
+        "zone": {
+          "example.com": { "TXT": ["v=spf1 include:_spf.example.net -all"] },
+          "_spf.example.net": { "TXT": ["v=spf1 ip4:192.0.2.0/24 -all"] }
+        }
+      },
+      "expect": { "result": "pass", "lookups": 1 }
+    },
+    {
+      "target": "verifySpf",
+      "name": "include of an empty domain is a permerror",
+      "input": {
+        "ip": "192.0.2.10",
+        "sender": "bob@example.com",
+        "zone": {
+          "example.com": { "TXT": ["v=spf1 include:nothing.example -all"] },
+          "nothing.example": {}
+        }
+      },
+      "expect": { "result": "permerror" }
+    },
+    {
+      "target": "verifySpf",
+      "name": "redirect hands over the verdict",
+      "input": {
+        "ip": "198.51.100.1",
+        "sender": "bob@example.com",
+        "zone": {
+          "example.com": { "TXT": ["v=spf1 redirect=_spf.example.org"] },
+          "_spf.example.org": { "TXT": ["v=spf1 ip4:192.0.2.0/24 -all"] }
+        }
+      },
+      "expect": { "result": "fail", "domain": "_spf.example.org" }
+    },
+    {
+      "target": "verifySpf",
+      "name": "a mechanism matches the domain's address",
+      "input": {
+        "ip": "192.0.2.10",
+        "sender": "bob@example.com",
+        "zone": { "example.com": { "TXT": ["v=spf1 a -all"], "A": ["192.0.2.10"] } }
+      },
+      "expect": { "result": "pass" }
+    },
+    {
+      "target": "verifySpf",
+      "name": "mx matches through the exchanger",
+      "input": {
+        "ip": "192.0.2.10",
+        "sender": "bob@example.com",
+        "zone": {
+          "example.com": { "TXT": ["v=spf1 mx -all"], "MX": ["mx1.example.com"] },
+          "mx1.example.com": { "A": ["192.0.2.10"] }
+        }
+      },
+      "expect": { "result": "pass" }
+    },
+    {
+      "target": "verifySpf",
+      "name": "reversed-ip macro expands in exists",
+      "input": {
+        "ip": "192.0.2.10",
+        "sender": "bob@example.com",
+        "zone": {
+          "example.com": { "TXT": ["v=spf1 exists:%{ir}.%{v}.%{d2} -all"] },
+          "10.2.0.192.in-addr.example.com": { "A": ["127.0.0.2"] }
+        }
+      },
+      "expect": { "result": "pass" }
+    },
+    {
+      "target": "verifySpf",
+      "name": "eleventh lookup is a permerror",
+      "input": {
+        "ip": "192.0.2.10",
+        "sender": "bob@example.com",
+        "zone": {
+          "example.com": { "TXT": ["v=spf1 include:i0.example -all"] },
+          "i0.example": { "TXT": ["v=spf1 include:i1.example -all"] },
+          "i1.example": { "TXT": ["v=spf1 include:i2.example -all"] },
+          "i2.example": { "TXT": ["v=spf1 include:i3.example -all"] },
+          "i3.example": { "TXT": ["v=spf1 include:i4.example -all"] },
+          "i4.example": { "TXT": ["v=spf1 include:i5.example -all"] },
+          "i5.example": { "TXT": ["v=spf1 include:i6.example -all"] },
+          "i6.example": { "TXT": ["v=spf1 include:i7.example -all"] },
+          "i7.example": { "TXT": ["v=spf1 include:i8.example -all"] },
+          "i8.example": { "TXT": ["v=spf1 include:i9.example -all"] },
+          "i9.example": { "TXT": ["v=spf1 include:i10.example -all"] },
+          "i10.example": { "TXT": ["v=spf1 -all"] }
+        }
+      },
+      "expect": { "result": "permerror" }
+    },
+    {
+      "target": "verifySpf",
+      "name": "third void lookup is a permerror",
+      "input": {
+        "ip": "192.0.2.10",
+        "sender": "bob@example.com",
+        "zone": {
+          "example.com": {
+            "TXT": ["v=spf1 a:v1.example a:v2.example a:v3.example -all"]
+          },
+          "v1.example": {},
+          "v2.example": {},
+          "v3.example": {}
+        }
+      },
+      "expect": { "result": "permerror" }
+    },
+    {
+      "target": "verifySpf",
+      "name": "dns failure is a temperror",
+      "input": {
+        "ip": "192.0.2.10",
+        "sender": "bob@example.com",
+        "zone": { "example.com": "TEMPERROR" }
+      },
+      "expect": { "result": "temperror" }
+    },
+    {
+      "target": "verifySpf",
+      "name": "exp explanation is fetched and expanded on fail",
+      "input": {
+        "ip": "192.0.2.10",
+        "sender": "bob@example.com",
+        "zone": {
+          "example.com": { "TXT": ["v=spf1 -all exp=why.example.com"] },
+          "why.example.com": { "TXT": ["%{i} may not send for %{d}"] }
+        }
+      },
+      "expect": {
+        "result": "fail",
+        "explanation": "192.0.2.10 may not send for example.com"
+      }
+    }
+  ]
+}

@@ -155,16 +155,16 @@
     },
     {
       "target": "analyzeSpf",
-      "name": "takes the last all mechanism, as evaluation does",
+      "name": "takes the first all mechanism, as evaluation does",
       "input": {
         "txt": [
           "v=spf1 -all include:x ~all"
         ]
       },
       "expect": {
-        "id": "spf-softfail",
-        "status": "warn",
-        "allQualifier": "~",
+        "id": "spf-hardfail",
+        "status": "pass",
+        "allQualifier": "-",
         "hasRecord": true
       }
     },
@@ -181,6 +181,20 @@
         "status": "pass",
         "allQualifier": "-",
         "hasRecord": true
+      }
+    },
+    {
+      "target": "analyzeSpf",
+      "name": "the first all decides, terms after it are dead",
+      "input": {
+        "txt": [
+          "v=spf1 ?all -all"
+        ]
+      },
+      "expect": {
+        "id": "spf-neutral",
+        "status": "fail",
+        "allQualifier": "?"
       }
     }
   ]
