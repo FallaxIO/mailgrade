@@ -1,5 +1,18 @@
 # mailgrade
 
+## 1.0.0
+
+### Major Changes
+
+- [`e576838`](https://github.com/FallaxIO/mailgrade/commit/e576838dc1c305406f755bb4b8cb8aa3d58e2b02) Thanks [@IgnaceMaes](https://github.com/IgnaceMaes)! - First stable release.
+  
+  No API changes from 0.2.0 — this marks the surface as settled and brings it
+  under semver: the grading, verification, DMARC record and header-analysis
+  entry points will not break without a major bump.
+  
+  Releases are now published from CI through npm trusted publishing, so every
+  version carries a provenance attestation and no long-lived token exists.
+
 ## 0.2.0
 
 ### Minor Changes
