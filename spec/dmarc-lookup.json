@@ -1,0 +1,184 @@
+{
+  "cases": [
+    {
+      "target": "analyzeDmarc",
+      "name": "fails when absent",
+      "input": {
+        "txt": [],
+        "source": "acme.com"
+      },
+      "expect": {
+        "id": "dmarc-missing",
+        "status": "fail",
+        "policy": null
+      }
+    },
+    {
+      "target": "analyzeDmarc",
+      "name": "ignores TXT noise that is not a DMARC record",
+      "input": {
+        "txt": [
+          "some-verification=1"
+        ],
+        "source": "acme.com"
+      },
+      "expect": {
+        "id": "dmarc-missing",
+        "status": "fail",
+        "policy": null
+      }
+    },
+    {
+      "target": "analyzeDmarc",
+      "name": "fails on more than one record at the same name",
+      "input": {
+        "txt": [
+          "v=DMARC1; p=reject",
+          "v=DMARC1; p=none"
+        ],
+        "source": "acme.com"
+      },
+      "expect": {
+        "id": "dmarc-multiple",
+        "status": "fail",
+        "policy": null
+      }
+    },
+    {
+      "target": "analyzeDmarc",
+      "name": "fails p=none, because monitoring is not enforcement",
+      "input": {
+        "txt": [
+          "v=DMARC1; p=none; rua=mailto:d@acme.com"
+        ],
+        "source": "acme.com"
+      },
+      "expect": {
+        "id": "dmarc-monitor",
+        "status": "fail",
+        "policy": "none"
+      }
+    },
+    {
+      "target": "analyzeDmarc",
+      "name": "warns on p=quarantine",
+      "input": {
+        "txt": [
+          "v=DMARC1; p=quarantine; rua=mailto:d@acme.com"
+        ],
+        "source": "acme.com"
+      },
+      "expect": {
+        "id": "dmarc-quarantine",
+        "status": "warn",
+        "policy": "quarantine"
+      }
+    },
+    {
+      "target": "analyzeDmarc",
+      "name": "passes a full p=reject",
+      "input": {
+        "txt": [
+          "v=DMARC1; p=reject; rua=mailto:d@acme.com"
+        ],
+        "source": "acme.com"
+      },
+      "expect": {
+        "id": "dmarc-enforcing",
+        "status": "pass",
+        "policy": "reject"
+      }
+    },
+    {
+      "target": "analyzeDmarc",
+      "name": "warns on reject with pct sampling",
+      "input": {
+        "txt": [
+          "v=DMARC1; p=reject; pct=50"
+        ],
+        "source": "acme.com"
+      },
+      "expect": {
+        "id": "dmarc-sampled",
+        "status": "warn",
+        "policy": "reject"
+      }
+    },
+    {
+      "target": "analyzeDmarc",
+      "name": "treats a malformed pct as the default 100, as receivers do",
+      "input": {
+        "txt": [
+          "v=DMARC1; p=reject; pct=abc"
+        ],
+        "source": "acme.com"
+      },
+      "expect": {
+        "id": "dmarc-enforcing",
+        "status": "pass",
+        "policy": "reject"
+      }
+    },
+    {
+      "target": "analyzeDmarc",
+      "name": "warns when subdomains are explicitly weaker",
+      "input": {
+        "txt": [
+          "v=DMARC1; p=reject; sp=none; rua=mailto:d@acme.com"
+        ],
+        "source": "acme.com"
+      },
+      "expect": {
+        "id": "dmarc-weak-subdomain",
+        "status": "warn",
+        "policy": "reject"
+      }
+    },
+    {
+      "target": "analyzeDmarc",
+      "name": "does not warn when subdomains inherit reject",
+      "input": {
+        "txt": [
+          "v=DMARC1; p=reject; sp=reject; rua=mailto:d@acme.com"
+        ],
+        "source": "acme.com"
+      },
+      "expect": {
+        "id": "dmarc-enforcing",
+        "status": "pass",
+        "policy": "reject"
+      }
+    },
+    {
+      "target": "analyzeDmarc",
+      "name": "fails a record whose policy is unreadable",
+      "input": {
+        "txt": [
+          "v=DMARC1; rua=mailto:d@acme.com"
+        ],
+        "source": "acme.com"
+      },
+      "expect": {
+        "id": "dmarc-no-policy",
+        "status": "fail",
+        "policy": null
+      }
+    },
+    {
+      "target": "analyzeDmarc",
+      "name": "records the org domain a subdomain inherited from",
+      "input": {
+        "txt": [
+          "v=DMARC1; p=reject; rua=mailto:d@acme.com"
+        ],
+        "source": "acme.com"
+      },
+      "expect": {
+        "id": "dmarc-enforcing",
+        "status": "pass",
+        "policy": "reject",
+        "source": "acme.com"
+      }
+    }
+  ]
+}

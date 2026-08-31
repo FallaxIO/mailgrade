@@ -1,0 +1,134 @@
+{
+  "name": "mailgrade",
+  "version": "0.1.0",
+  "description": "Grade a domain's SPF, DMARC and DKIM. Zero dependencies, no network, runs anywhere.",
+  "keywords": [
+    "dmarc",
+    "spf",
+    "dkim",
+    "email",
+    "email-authentication",
+    "spoofing",
+    "phishing",
+    "dns",
+    "deliverability",
+    "email-headers"
+  ],
+  "license": "MIT",
+  "author": "Fallax",
+  "homepage": "https://github.com/fallaxio/mailgrade#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fallaxio/mailgrade.git"
+  },
+  "bugs": "https://github.com/fallaxio/mailgrade/issues",
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=20"
+  },
+  "files": [
+    "dist",
+    "spec"
+  ],
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./spf": {
+      "import": {
+        "types": "./dist/spf.d.ts",
+        "default": "./dist/spf.js"
+      },
+      "require": {
+        "types": "./dist/spf.d.cts",
+        "default": "./dist/spf.cjs"
+      }
+    },
+    "./dkim": {
+      "import": {
+        "types": "./dist/dkim.d.ts",
+        "default": "./dist/dkim.js"
+      },
+      "require": {
+        "types": "./dist/dkim.d.cts",
+        "default": "./dist/dkim.cjs"
+      }
+    },
+    "./dmarc": {
+      "import": {
+        "types": "./dist/dmarc/index.d.ts",
+        "default": "./dist/dmarc/index.js"
+      },
+      "require": {
+        "types": "./dist/dmarc/index.d.cts",
+        "default": "./dist/dmarc/index.cjs"
+      }
+    },
+    "./headers": {
+      "import": {
+        "types": "./dist/headers/index.d.ts",
+        "default": "./dist/headers/index.js"
+      },
+      "require": {
+        "types": "./dist/headers/index.d.cts",
+        "default": "./dist/headers/index.cjs"
+      }
+    },
+    "./domain": {
+      "import": {
+        "types": "./dist/domain.d.ts",
+        "default": "./dist/domain.js"
+      },
+      "require": {
+        "types": "./dist/domain.d.cts",
+        "default": "./dist/domain.cjs"
+      }
+    },
+    "./doh": {
+      "import": {
+        "types": "./dist/doh.d.ts",
+        "default": "./dist/doh.js"
+      },
+      "require": {
+        "types": "./dist/doh.d.cts",
+        "default": "./dist/doh.cjs"
+      }
+    },
+    "./spec/*": "./spec/*",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "oxlint",
+    "typecheck": "tsc",
+    "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm publint && pnpm attw",
+    "publint": "publint",
+    "attw": "attw --pack . --profile node16",
+    "release": "pnpm build && changeset publish"
+  },
+  "devDependencies": {
+    "@arethetypeswrong/cli": "^0.18.5",
+    "@changesets/changelog-github": "^1.0.0",
+    "@changesets/cli": "^3.0.1",
+    "@types/node": "^26.4.0",
+    "oxlint": "^1.80.0",
+    "publint": "^0.3.24",
+    "tsdown": "^0.22.14",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.11"
+  },
+  "packageManager": "pnpm@10.15.0"
+}

@@ -1,0 +1,149 @@
+{
+  "cases": [
+    {
+      "target": "coerceDomain",
+      "name": "passes a plain domain through lower-cased",
+      "input": {
+        "raw": "Acme.COM"
+      },
+      "expect": {
+        "domain": "acme.com"
+      }
+    },
+    {
+      "target": "coerceDomain",
+      "name": "strips scheme, path, port and www from a pasted URL",
+      "input": {
+        "raw": "https://www.acme.com:8443/pricing?x=1#top"
+      },
+      "expect": {
+        "domain": "acme.com"
+      }
+    },
+    {
+      "target": "coerceDomain",
+      "name": "takes the domain of a pasted email address",
+      "input": {
+        "raw": "  Bob@Mail.Acme.com "
+      },
+      "expect": {
+        "domain": "mail.acme.com"
+      }
+    },
+    {
+      "target": "coerceDomain",
+      "name": "drops stray dots",
+      "input": {
+        "raw": ".acme.com."
+      },
+      "expect": {
+        "domain": "acme.com"
+      }
+    },
+    {
+      "target": "coerceDomain",
+      "name": "keeps a subdomain that is not www",
+      "input": {
+        "raw": "news.acme.com"
+      },
+      "expect": {
+        "domain": "news.acme.com"
+      }
+    },
+    {
+      "target": "registrableDomain",
+      "name": "trims a subdomain",
+      "input": {
+        "host": "mail.acme.com"
+      },
+      "expect": {
+        "domain": "acme.com"
+      }
+    },
+    {
+      "target": "registrableDomain",
+      "name": "knows two-label public suffixes",
+      "input": {
+        "host": "mail.acme.co.uk"
+      },
+      "expect": {
+        "domain": "acme.co.uk"
+      }
+    },
+    {
+      "target": "registrableDomain",
+      "name": "is null for a bare public suffix",
+      "input": {
+        "host": "co.uk"
+      },
+      "expect": {
+        "domain": null
+      }
+    },
+    {
+      "target": "registrableDomain",
+      "name": "is null for a single label",
+      "input": {
+        "host": "localhost"
+      },
+      "expect": {
+        "domain": null
+      }
+    },
+    {
+      "target": "aligns",
+      "name": "matches identical domains",
+      "input": {
+        "a": "acme.com",
+        "b": "acme.com"
+      },
+      "expect": {
+        "aligns": true
+      }
+    },
+    {
+      "target": "aligns",
+      "name": "matches a subdomain to its organizational domain",
+      "input": {
+        "a": "mail.acme.com",
+        "b": "acme.com"
+      },
+      "expect": {
+        "aligns": true
+      }
+    },
+    {
+      "target": "aligns",
+      "name": "does not match unrelated domains sharing a suffix",
+      "input": {
+        "a": "acme.com",
+        "b": "evil.com"
+      },
+      "expect": {
+        "aligns": false
+      }
+    },
+    {
+      "target": "aligns",
+      "name": "does not match two subdomains of a public suffix",
+      "input": {
+        "a": "a.co.uk",
+        "b": "b.co.uk"
+      },
+      "expect": {
+        "aligns": false
+      }
+    },
+    {
+      "target": "aligns",
+      "name": "is false when either side is missing",
+      "input": {
+        "a": null,
+        "b": "acme.com"
+      },
+      "expect": {
+        "aligns": false
+      }
+    }
+  ]
+}

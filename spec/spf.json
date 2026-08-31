@@ -1,0 +1,187 @@
+{
+  "cases": [
+    {
+      "target": "analyzeSpf",
+      "name": "fails when no SPF record sits among the other TXT records",
+      "input": {
+        "txt": [
+          "google-site-verification=abc",
+          "MS=ms12345"
+        ]
+      },
+      "expect": {
+        "id": "spf-missing",
+        "status": "fail",
+        "allQualifier": null,
+        "hasRecord": false
+      }
+    },
+    {
+      "target": "analyzeSpf",
+      "name": "fails on multiple SPF records, which receivers treat as permerror",
+      "input": {
+        "txt": [
+          "v=spf1 include:_spf.google.com ~all",
+          "v=spf1 include:sendgrid.net -all"
+        ]
+      },
+      "expect": {
+        "id": "spf-multiple",
+        "status": "fail",
+        "allQualifier": null,
+        "hasRecord": true
+      }
+    },
+    {
+      "target": "analyzeSpf",
+      "name": "does not mistake an SPF-lookalike TXT record for SPF",
+      "input": {
+        "txt": [
+          "v=spf10 nonsense",
+          "spf1 include:x"
+        ]
+      },
+      "expect": {
+        "id": "spf-missing",
+        "status": "fail",
+        "allQualifier": null,
+        "hasRecord": false
+      }
+    },
+    {
+      "target": "analyzeSpf",
+      "name": "passes -all",
+      "input": {
+        "txt": [
+          "v=spf1 include:_spf.google.com -all"
+        ]
+      },
+      "expect": {
+        "id": "spf-hardfail",
+        "status": "pass",
+        "allQualifier": "-",
+        "hasRecord": true
+      }
+    },
+    {
+      "target": "analyzeSpf",
+      "name": "warns on ~all",
+      "input": {
+        "txt": [
+          "v=spf1 include:_spf.google.com ~all"
+        ]
+      },
+      "expect": {
+        "id": "spf-softfail",
+        "status": "warn",
+        "allQualifier": "~",
+        "hasRecord": true
+      }
+    },
+    {
+      "target": "analyzeSpf",
+      "name": "fails ?all, which excuses everyone",
+      "input": {
+        "txt": [
+          "v=spf1 mx ?all"
+        ]
+      },
+      "expect": {
+        "id": "spf-neutral",
+        "status": "fail",
+        "allQualifier": "?",
+        "hasRecord": true
+      }
+    },
+    {
+      "target": "analyzeSpf",
+      "name": "fails +all, which authorises everyone",
+      "input": {
+        "txt": [
+          "v=spf1 mx +all"
+        ]
+      },
+      "expect": {
+        "id": "spf-allow-all",
+        "status": "fail",
+        "allQualifier": "+",
+        "hasRecord": true
+      }
+    },
+    {
+      "target": "analyzeSpf",
+      "name": "reads a bare all as +all",
+      "input": {
+        "txt": [
+          "v=spf1 mx all"
+        ]
+      },
+      "expect": {
+        "id": "spf-allow-all",
+        "status": "fail",
+        "allQualifier": "+",
+        "hasRecord": true
+      }
+    },
+    {
+      "target": "analyzeSpf",
+      "name": "warns, rather than fails, when evaluation is delegated via redirect=",
+      "input": {
+        "txt": [
+          "v=spf1 redirect=_spf.acme.com"
+        ]
+      },
+      "expect": {
+        "id": "spf-redirect",
+        "status": "warn",
+        "allQualifier": null,
+        "hasRecord": true
+      }
+    },
+    {
+      "target": "analyzeSpf",
+      "name": "fails a record that never reaches a judgement",
+      "input": {
+        "txt": [
+          "v=spf1 include:_spf.google.com"
+        ]
+      },
+      "expect": {
+        "id": "spf-no-all",
+        "status": "fail",
+        "allQualifier": null,
+        "hasRecord": true
+      }
+    },
+    {
+      "target": "analyzeSpf",
+      "name": "takes the last all mechanism, as evaluation does",
+      "input": {
+        "txt": [
+          "v=spf1 -all include:x ~all"
+        ]
+      },
+      "expect": {
+        "id": "spf-softfail",
+        "status": "warn",
+        "allQualifier": "~",
+        "hasRecord": true
+      }
+    },
+    {
+      "target": "analyzeSpf",
+      "name": "is case-insensitive about the version tag",
+      "input": {
+        "txt": [
+          "V=SPF1 MX -ALL"
+        ]
+      },
+      "expect": {
+        "id": "spf-hardfail",
+        "status": "pass",
+        "allQualifier": "-",
+        "hasRecord": true
+      }
+    }
+  ]
+}

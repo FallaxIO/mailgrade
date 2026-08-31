@@ -1,0 +1,201 @@
+{
+  "cases": [
+    {
+      "target": "gradeDomain",
+      "name": "calls a fully locked-down domain protected",
+      "input": {
+        "domain": "acme.com",
+        "txt": [
+          "v=spf1 include:_spf.google.com -all"
+        ],
+        "dmarc": [
+          "v=DMARC1; p=reject; rua=mailto:dmarc@acme.com"
+        ],
+        "dkimSelectors": [
+          "google"
+        ],
+        "mx": [
+          "aspmx.l.google.com"
+        ]
+      },
+      "expect": {
+        "verdict": "protected",
+        "spfId": "spf-hardfail",
+        "dmarcId": "dmarc-enforcing",
+        "dkimId": "dkim-published",
+        "provider": "Google Workspace",
+        "recommendationIds": [
+          "keep-watching"
+        ]
+      }
+    },
+    {
+      "target": "gradeDomain",
+      "name": "calls a domain with nothing published spoofable, and tells it to lock the parking",
+      "input": {
+        "domain": "parked.example",
+        "txt": [],
+        "dmarc": [],
+        "dkimSelectors": [],
+        "mx": []
+      },
+      "expect": {
+        "verdict": "spoofable",
+        "spfId": "spf-missing",
+        "dmarcId": "dmarc-missing",
+        "dkimId": "dkim-absent",
+        "provider": null,
+        "recommendationIds": [
+          "lock-parked-domain",
+          "publish-dmarc"
+        ]
+      }
+    },
+    {
+      "target": "gradeDomain",
+      "name": "says a parked domain that is already locked has nothing left to do",
+      "input": {
+        "domain": "parked.example",
+        "txt": [
+          "v=spf1 -all"
+        ],
+        "dmarc": [
+          "v=DMARC1; p=reject; rua=mailto:d@parked.example"
+        ],
+        "dkimSelectors": [],
+        "mx": []
+      },
+      "expect": {
+        "verdict": "protected",
+        "recommendationIds": [
+          "nothing-to-add"
+        ]
+      }
+    },
+    {
+      "target": "gradeDomain",
+      "name": "lets +all defeat an enforcing DMARC policy",
+      "input": {
+        "domain": "acme.com",
+        "txt": [
+          "v=spf1 +all"
+        ],
+        "dmarc": [
+          "v=DMARC1; p=reject; rua=mailto:dmarc@acme.com"
+        ],
+        "dkimSelectors": [],
+        "mx": [
+          "acme-com.mail.protection.outlook.com"
+        ]
+      },
+      "expect": {
+        "verdict": "spoofable",
+        "spfId": "spf-allow-all",
+        "dmarcId": "dmarc-enforcing",
+        "provider": "Microsoft 365",
+        "recommendationIds": [
+          "remove-plus-all",
+          "enable-dkim"
+        ]
+      }
+    },
+    {
+      "target": "gradeDomain",
+      "name": "calls monitoring-only spoofable however good the SPF is",
+      "input": {
+        "domain": "acme.com",
+        "txt": [
+          "v=spf1 include:_spf.google.com -all"
+        ],
+        "dmarc": [
+          "v=DMARC1; p=none; rua=mailto:dmarc@acme.com"
+        ],
+        "dkimSelectors": [
+          "google"
+        ],
+        "mx": [
+          "aspmx.l.google.com"
+        ]
+      },
+      "expect": {
+        "verdict": "spoofable",
+        "dmarcId": "dmarc-monitor",
+        "recommendationIds": [
+          "graduate-dmarc"
+        ]
+      }
+    },
+    {
+      "target": "gradeDomain",
+      "name": "calls quarantine partial",
+      "input": {
+        "domain": "acme.com",
+        "txt": [
+          "v=spf1 -all"
+        ],
+        "dmarc": [
+          "v=DMARC1; p=quarantine; rua=mailto:dmarc@acme.com"
+        ],
+        "dkimSelectors": [
+          "selector1"
+        ],
+        "mx": [
+          "acme-com.mail.protection.outlook.com"
+        ]
+      },
+      "expect": {
+        "verdict": "partial",
+        "dmarcId": "dmarc-quarantine",
+        "recommendationIds": [
+          "tighten-dmarc"
+        ]
+      }
+    },
+    {
+      "target": "gradeDomain",
+      "name": "tells a sending domain with no DMARC to publish one",
+      "input": {
+        "domain": "acme.com",
+        "txt": [
+          "v=spf1 include:_spf.google.com ~all"
+        ],
+        "dmarc": [],
+        "dkimSelectors": [],
+        "mx": [
+          "aspmx.l.google.com"
+        ]
+      },
+      "expect": {
+        "verdict": "spoofable",
+        "spfId": "spf-softfail",
+        "recommendationIds": [
+          "enable-dkim",
+          "publish-dmarc"
+        ]
+      }
+    },
+    {
+      "target": "gradeDomain",
+      "name": "does not tell a domain with no record to fix its record",
+      "input": {
+        "domain": "acme.com",
+        "txt": [],
+        "dmarc": [
+          "v=DMARC1; p=reject; rua=mailto:d@acme.com"
+        ],
+        "dkimSelectors": [
+          "google"
+        ],
+        "mx": [
+          "aspmx.l.google.com"
+        ]
+      },
+      "expect": {
+        "verdict": "protected",
+        "recommendationIds": [
+          "publish-spf"
+        ]
+      }
+    }
+  ]
+}

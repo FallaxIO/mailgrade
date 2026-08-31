@@ -1,0 +1,558 @@
+{
+  "cases": [
+    {
+      "target": "analyzeHeaders",
+      "name": "reads a message that authenticates end to end",
+      "input": {
+        "raw": "Delivered-To: alice@acme.example\nReceived: by 2002:a05:6402::1 with SMTP id x1csp123456;\n        Tue, 3 Jun 2025 09:12:44 -0700 (PDT)\nReceived: from mail-ed1-f54.google.com (mail-ed1-f54.google.com. [209.85.208.54])\n        by mx.google.com with ESMTPS id y7si999999edx.55.2025.06.03.09.12.43\n        for <alice@acme.example>;\n        Tue, 3 Jun 2025 09:12:43 -0700 (PDT)\nReceived-SPF: pass (google.com: domain of bounces@notify.stripe.com designates 209.85.208.54 as permitted sender) client-ip=209.85.208.54;\nAuthentication-Results: mx.google.com;\n       dkim=pass header.d=stripe.com header.s=s1 header.b=Nq7Fq9Aa;\n       spf=pass (google.com: domain of bounces@notify.stripe.com designates 209.85.208.54 as permitted sender) smtp.mailfrom=bounces@notify.stripe.com;\n       dmarc=pass (p=REJECT sp=REJECT dis=NONE) header.from=stripe.com\nDKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=stripe.com; s=s1; t=1748966;\nReturn-Path: <bounces@notify.stripe.com>\nFrom: Stripe <receipts@stripe.com>\nTo: alice@acme.example\nSubject: Your receipt from Acme\nDate: Tue, 3 Jun 2025 16:12:40 +0000\nMessage-ID: <20250603161240.9a1@stripe.com>\n\nThanks for your payment.\n"
+      },
+      "expect": {
+        "verdict": "authentic",
+        "authSource": "receiver",
+        "fromDomain": "stripe.com",
+        "spfResult": "pass",
+        "spfAligned": true,
+        "dkimResult": "pass",
+        "dkimAligned": true,
+        "dmarcResult": "pass",
+        "flagIds": [],
+        "hopCount": 2,
+        "originatingIp": "209.85.208.54",
+        "subject": "Your receipt from Acme",
+        "recommendationIds": [
+          "auth-is-not-intent",
+          "judge-the-request"
+        ]
+      }
+    },
+    {
+      "target": "analyzeHeaders",
+      "name": "names every reason a forged invoice is a forgery",
+      "input": {
+        "raw": "Received: from vps-4491.hosting.example (vps-4491.hosting.example [185.22.11.9])\n        by mx.acme.example with ESMTP id 4b2c1f;\n        Mon, 2 Jun 2025 03:41:02 +0000\nAuthentication-Results: mx.acme.example;\n       spf=fail (sender IP is 185.22.11.9) smtp.mailfrom=billing@acme-invoices.example;\n       dkim=none;\n       dmarc=fail (p=none dis=none) header.from=acme.example\nReturn-Path: <billing@acme-invoices.example>\nFrom: Acme Finance <invoices@acme.example>\nReply-To: finance.acme@mail-secure.example\nTo: bob@acme.example\nSubject: Overdue invoice INV-4471\nDate: Mon, 2 Jun 2025 03:41:00 +0000\nX-PHP-Originating-Script: 0:sendmail.php\nX-Mailer: PHPMailer 6.8.0\nMessage-ID: <991.66aa@acme-invoices.example>\n\nPlease settle the attached invoice today.\n"
+      },
+      "expect": {
+        "verdict": "suspicious",
+        "authSource": "receiver",
+        "fromDomain": "acme.example",
+        "spfResult": "fail",
+        "dkimResult": "none",
+        "dmarcResult": "fail",
+        "flagIds": [
+          "dmarc-fail",
+          "spf-fail",
+          "reply-to-mismatch",
+          "return-path-mismatch",
+          "php-origin"
+        ],
+        "hopCount": 1,
+        "originatingIp": "185.22.11.9",
+        "recommendationIds": [
+          "do-not-engage",
+          "verify-by-phone",
+          "check-own-domain"
+        ]
+      }
+    },
+    {
+      "target": "analyzeHeaders",
+      "name": "does not accept an honest pass for somebody else's domain",
+      "input": {
+        "raw": "Received: from o1.sender.example (o1.sender.example [167.89.1.2])\n        by mx.acme.example with ESMTP id 77aa1;\n        Mon, 2 Jun 2025 03:41:02 +0000\nAuthentication-Results: mx.acme.example;\n       spf=pass smtp.mailfrom=bounce@sender.example;\n       dkim=pass header.d=sender.example;\n       dmarc=fail header.from=paypal.com\nFrom: PayPal <service@paypal.com>\nTo: bob@acme.example\nSubject: Confirm your account details\nDate: Mon, 2 Jun 2025 03:41:00 +0000\n"
+      },
+      "expect": {
+        "verdict": "suspicious",
+        "fromDomain": "paypal.com",
+        "spfResult": "pass",
+        "spfAligned": false,
+        "dkimResult": "pass",
+        "dkimAligned": false,
+        "dmarcResult": "fail",
+        "flagIds": [
+          "dmarc-fail"
+        ],
+        "recommendationIds": [
+          "do-not-engage",
+          "check-own-domain"
+        ]
+      }
+    },
+    {
+      "target": "analyzeHeaders",
+      "name": "catches an address hidden in the display name",
+      "input": {
+        "raw": "Received: from mailer.example (mailer.example [10.0.0.5])\n        by mx.acme.example with ESMTP id 33bb2;\n        Mon, 2 Jun 2025 03:41:02 +0000\nAuthentication-Results: mx.acme.example; spf=pass smtp.mailfrom=send@mailer.example; dkim=none; dmarc=none header.from=mailer.example\nFrom: \"security@microsoft.com\" <alerts@mailer.example>\nTo: bob@acme.example\nSubject: Unusual sign-in attempt\nDate: Mon, 2 Jun 2025 03:41:00 +0000\n"
+      },
+      "expect": {
+        "verdict": "suspicious",
+        "fromDomain": "mailer.example",
+        "spfResult": "pass",
+        "spfAligned": true,
+        "dmarcResult": "none",
+        "flagIds": [
+          "display-name-address"
+        ],
+        "hopCount": 1,
+        "originatingIp": "10.0.0.5"
+      }
+    },
+    {
+      "target": "analyzeHeaders",
+      "name": "flags an encoded sender domain even when it authenticates",
+      "input": {
+        "raw": "Received: from mail.xn--micrsoft-8za.com (mail.xn--micrsoft-8za.com [203.0.113.9])\n        by mx.acme.example with ESMTP id 55cc3;\n        Mon, 2 Jun 2025 03:41:02 +0000\nAuthentication-Results: mx.acme.example; spf=pass smtp.mailfrom=noreply@xn--micrsoft-8za.com; dkim=none; dmarc=pass header.from=xn--micrsoft-8za.com\nFrom: Microsoft Account <no-reply@xn--micrsoft-8za.com>\nTo: bob@acme.example\nSubject: Unusual sign-in activity\nDate: Mon, 2 Jun 2025 03:41:00 +0000\n"
+      },
+      "expect": {
+        "verdict": "suspicious",
+        "fromDomain": "xn--micrsoft-8za.com",
+        "dmarcResult": "pass",
+        "flagIds": [
+          "punycode"
+        ],
+        "originatingIp": "203.0.113.9"
+      }
+    },
+    {
+      "target": "analyzeHeaders",
+      "name": "is inconclusive when no receiver recorded a result",
+      "input": {
+        "raw": "From: Someone <someone@example.org>\nTo: me@acme.example\nSubject: Hello there\nDate: Mon, 2 Jun 2025 03:41:00 +0000\n"
+      },
+      "expect": {
+        "verdict": "inconclusive",
+        "authSource": "none",
+        "fromDomain": "example.org",
+        "spfResult": null,
+        "dmarcResult": null,
+        "flagIds": [
+          "no-received"
+        ],
+        "hopCount": 0,
+        "recommendationIds": [
+          "get-full-source",
+          "receiver-not-recording"
+        ]
+      }
+    },
+    {
+      "target": "analyzeHeaders",
+      "name": "returns the empty shape for a paste with no headers in it",
+      "input": {
+        "raw": "this is just some prose someone pasted"
+      },
+      "expect": {
+        "verdict": "inconclusive",
+        "authSource": "none",
+        "fromDomain": null,
+        "flagIds": [],
+        "hopCount": 0,
+        "recommendationIds": []
+      }
+    },
+    {
+      "target": "analyzeHeaders",
+      "name": "falls back to Received-SPF when there is no Authentication-Results",
+      "input": {
+        "raw": "Received-SPF: pass (mx.acme.example: domain of bounce@news.acme.com designates 198.51.100.7 as permitted sender) client-ip=198.51.100.7; envelope-from=bounce@news.acme.com;\nReceived: from o1.news.acme.com (o1.news.acme.com [198.51.100.7])\n        by mx.acme.example with ESMTP id 88dd4;\n        Mon, 2 Jun 2025 03:41:02 +0000\nFrom: Acme News <news@acme.com>\nTo: bob@acme.example\nSubject: This week at Acme\nDate: Mon, 2 Jun 2025 03:41:00 +0000\nList-Unsubscribe: <mailto:unsub@acme.com>\n"
+      },
+      "expect": {
+        "verdict": "authentic",
+        "authSource": "received-spf",
+        "fromDomain": "acme.com",
+        "spfResult": "pass",
+        "spfAligned": true,
+        "flagIds": [
+          "bulk"
+        ],
+        "hopCount": 1
+      }
+    },
+    {
+      "target": "analyzeHeaders",
+      "name": "uses ARC results only when nothing closer to the mailbox exists",
+      "input": {
+        "raw": "ARC-Authentication-Results: i=1; mx.forwarder.example; spf=pass smtp.mailfrom=news@acme.com; dkim=pass header.d=acme.com; dmarc=pass header.from=acme.com\nReceived: from o1.acme.com (o1.acme.com [198.51.100.7])\n        by mx.forwarder.example with ESMTP id 99ee5;\n        Mon, 2 Jun 2025 03:41:02 +0000\nFrom: Acme <news@acme.com>\nTo: bob@acme.example\nSubject: Forwarded along\nDate: Mon, 2 Jun 2025 03:41:00 +0000\n"
+      },
+      "expect": {
+        "verdict": "authentic",
+        "authSource": "arc",
+        "fromDomain": "acme.com",
+        "spfResult": "pass",
+        "dkimResult": "pass",
+        "dmarcResult": "pass",
+        "flagIds": []
+      }
+    },
+    {
+      "target": "analyzeHeaders",
+      "name": "decodes an encoded subject, flags backdating and a filter verdict",
+      "input": {
+        "raw": "Received: from relay.example (relay.example [203.0.113.44])\n        by mx.acme.example with ESMTP id aa11b;\n        Mon, 2 Jun 2025 03:41:02 +0000\nAuthentication-Results: mx.acme.example; spf=pass smtp.mailfrom=post@relay.example; dkim=none; dmarc=pass header.from=relay.example\nFrom: Accounts <post@relay.example>\nTo: bob@acme.example\nSubject: =?utf-8?B?UGF5bWVudCBjb25maXJtYXRpb24=?=\nDate: Mon, 12 May 2025 08:00:00 +0000\nX-Spam-Status: Yes, score=7.2\n"
+      },
+      "expect": {
+        "verdict": "authentic",
+        "fromDomain": "relay.example",
+        "subject": "Payment confirmation",
+        "flagIds": [
+          "filter-flagged",
+          "date-skew"
+        ]
+      }
+    },
+    {
+      "target": "parseHeaders",
+      "name": "unfolds continuation lines onto the field above",
+      "input": {
+        "raw": "Subject: a long\n subject line\nFrom: a@b.com\n"
+      },
+      "expect": {
+        "fields": [
+          [
+            "Subject",
+            "a long subject line"
+          ],
+          [
+            "From",
+            "a@b.com"
+          ]
+        ]
+      }
+    },
+    {
+      "target": "parseHeaders",
+      "name": "stops at the blank line so the body cannot forge a header",
+      "input": {
+        "raw": "From: a@b.com\n\nSubject: not a header\n"
+      },
+      "expect": {
+        "fields": [
+          [
+            "From",
+            "a@b.com"
+          ]
+        ]
+      }
+    },
+    {
+      "target": "parseHeaders",
+      "name": "tolerates CRLF, leading blank lines and an mbox separator",
+      "input": {
+        "raw": "\r\n\r\nFrom alice@example.com Tue Jun 3 09:00:00 2025\r\nFrom: a@b.com\r\n"
+      },
+      "expect": {
+        "fields": [
+          [
+            "From",
+            "a@b.com"
+          ]
+        ]
+      }
+    },
+    {
+      "target": "parseHeaders",
+      "name": "returns nothing for prose that is not a header block",
+      "input": {
+        "raw": "hello, this is not a header block"
+      },
+      "expect": {
+        "fields": []
+      }
+    },
+    {
+      "target": "parseAddress",
+      "name": "splits a display name from the real address",
+      "input": {
+        "raw": "Acme Billing <billing@acme.com>"
+      },
+      "expect": {
+        "display": "Acme Billing",
+        "address": "billing@acme.com",
+        "domain": "acme.com"
+      }
+    },
+    {
+      "target": "parseAddress",
+      "name": "unquotes a quoted display name",
+      "input": {
+        "raw": "\"Acme, Inc.\" <billing@acme.com>"
+      },
+      "expect": {
+        "display": "Acme, Inc.",
+        "address": "billing@acme.com",
+        "domain": "acme.com"
+      }
+    },
+    {
+      "target": "parseAddress",
+      "name": "handles a bare address",
+      "input": {
+        "raw": "billing@acme.com"
+      },
+      "expect": {
+        "display": null,
+        "address": "billing@acme.com",
+        "domain": "acme.com"
+      }
+    },
+    {
+      "target": "parseAddress",
+      "name": "decodes an encoded display name before anything reads it",
+      "input": {
+        "raw": "=?utf-8?B?QWNtZSBCaWxsaW5n?= <billing@acme.com>"
+      },
+      "expect": {
+        "display": "Acme Billing",
+        "address": "billing@acme.com",
+        "domain": "acme.com"
+      }
+    },
+    {
+      "target": "parseAddress",
+      "name": "returns a null address for a malformed value",
+      "input": {
+        "raw": "undisclosed-recipients:;"
+      },
+      "expect": {
+        "address": null,
+        "domain": null
+      }
+    },
+    {
+      "target": "decodeEncodedWords",
+      "name": "decodes base64 encoded words",
+      "input": {
+        "value": "=?utf-8?B?VGhpcyBpcyBhIHRlc3Q=?="
+      },
+      "expect": {
+        "text": "This is a test"
+      }
+    },
+    {
+      "target": "decodeEncodedWords",
+      "name": "decodes quoted-printable, where underscore is a space",
+      "input": {
+        "value": "=?iso-8859-1?Q?Fw=3A_caf=E9_invoice?="
+      },
+      "expect": {
+        "text": "Fw: caf\u00e9 invoice"
+      }
+    },
+    {
+      "target": "decodeEncodedWords",
+      "name": "leaves a malformed encoded word alone rather than throwing",
+      "input": {
+        "value": "=?utf-8?B?!!!not-base64!!!?="
+      },
+      "expect": {
+        "text": "=?utf-8?B?!!!not-base64!!!?="
+      }
+    },
+    {
+      "target": "stripComments",
+      "name": "removes a receiver's parenthesised explanation",
+      "input": {
+        "value": "dmarc=pass (p=REJECT sp=REJECT dis=NONE) header.from=acme.com"
+      },
+      "expect": {
+        "text": "dmarc=pass header.from=acme.com"
+      }
+    },
+    {
+      "target": "stripComments",
+      "name": "handles nested parentheses",
+      "input": {
+        "value": "spf=pass (a (b) c) smtp.mailfrom=x@acme.com"
+      },
+      "expect": {
+        "text": "spf=pass smtp.mailfrom=x@acme.com"
+      }
+    },
+    {
+      "target": "isPrivateIp",
+      "name": "recognises RFC 1918 space",
+      "input": {
+        "ip": "10.1.2.3"
+      },
+      "expect": {
+        "private": true
+      }
+    },
+    {
+      "target": "isPrivateIp",
+      "name": "recognises the 172.16/12 block",
+      "input": {
+        "ip": "172.20.0.1"
+      },
+      "expect": {
+        "private": true
+      }
+    },
+    {
+      "target": "isPrivateIp",
+      "name": "leaves 172.32 alone",
+      "input": {
+        "ip": "172.32.0.1"
+      },
+      "expect": {
+        "private": false
+      }
+    },
+    {
+      "target": "isPrivateIp",
+      "name": "recognises loopback",
+      "input": {
+        "ip": "127.0.0.1"
+      },
+      "expect": {
+        "private": true
+      }
+    },
+    {
+      "target": "isPrivateIp",
+      "name": "recognises IPv6 loopback",
+      "input": {
+        "ip": "::1"
+      },
+      "expect": {
+        "private": true
+      }
+    },
+    {
+      "target": "isPrivateIp",
+      "name": "recognises IPv6 unique-local",
+      "input": {
+        "ip": "fd00::1"
+      },
+      "expect": {
+        "private": true
+      }
+    },
+    {
+      "target": "isPrivateIp",
+      "name": "calls a public address public",
+      "input": {
+        "ip": "209.85.208.54"
+      },
+      "expect": {
+        "private": false
+      }
+    },
+    {
+      "target": "editDistance",
+      "name": "counts substitutions and insertions",
+      "input": {
+        "a": "kitten",
+        "b": "sitting"
+      },
+      "expect": {
+        "distance": 3
+      }
+    },
+    {
+      "target": "editDistance",
+      "name": "counts a single character swap",
+      "input": {
+        "a": "microsoft",
+        "b": "micros0ft"
+      },
+      "expect": {
+        "distance": 1
+      }
+    },
+    {
+      "target": "editDistance",
+      "name": "is zero for identical strings",
+      "input": {
+        "a": "acme",
+        "b": "acme"
+      },
+      "expect": {
+        "distance": 0
+      }
+    },
+    {
+      "target": "detectImpersonation",
+      "name": "catches a brand name used as a label on someone else's domain",
+      "input": {
+        "domain": "paypal-secure.co"
+      },
+      "expect": {
+        "brand": "paypal.com",
+        "kind": "token"
+      }
+    },
+    {
+      "target": "detectImpersonation",
+      "name": "catches a brand name in a subdomain",
+      "input": {
+        "domain": "microsoft.login-verify.example"
+      },
+      "expect": {
+        "brand": "microsoft.com",
+        "kind": "token"
+      }
+    },
+    {
+      "target": "detectImpersonation",
+      "name": "catches a single-character typosquat",
+      "input": {
+        "domain": "micros0ft.com"
+      },
+      "expect": {
+        "brand": "microsoft.com",
+        "kind": "typosquat"
+      }
+    },
+    {
+      "target": "detectImpersonation",
+      "name": "reports the same name under another suffix as worth checking",
+      "input": {
+        "domain": "paypal.co"
+      },
+      "expect": {
+        "brand": "paypal.com",
+        "kind": "suffix"
+      }
+    },
+    {
+      "target": "detectImpersonation",
+      "name": "leaves the brands' own domains alone",
+      "input": {
+        "domain": "microsoft.com"
+      },
+      "expect": {
+        "brand": null
+      }
+    },
+    {
+      "target": "detectImpersonation",
+      "name": "leaves the brands' own subdomains alone",
+      "input": {
+        "domain": "login.microsoft.com"
+      },
+      "expect": {
+        "brand": null
+      }
+    },
+    {
+      "target": "detectImpersonation",
+      "name": "does not flag an unrelated domain",
+      "input": {
+        "domain": "acme.com"
+      },
+      "expect": {
+        "brand": null
+      }
+    },
+    {
+      "target": "detectImpersonation",
+      "name": "does not typosquat-flag a short name one edit away",
+      "input": {
+        "domain": "apply.com"
+      },
+      "expect": {
+        "brand": null
+      }
+    }
+  ]
+}

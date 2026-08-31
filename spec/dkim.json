@@ -1,0 +1,70 @@
+{
+  "cases": [
+    {
+      "target": "isDkimKey",
+      "name": "accepts a standard key",
+      "input": {
+        "txt": "v=DKIM1; k=rsa; p=MIIBIjANBgkq"
+      },
+      "expect": {
+        "isKey": true
+      }
+    },
+    {
+      "target": "isDkimKey",
+      "name": "accepts a key without the optional v= tag",
+      "input": {
+        "txt": "k=rsa; p=MIIBIjANBgkq"
+      },
+      "expect": {
+        "isKey": true
+      }
+    },
+    {
+      "target": "isDkimKey",
+      "name": "rejects a revoked key with an empty p=",
+      "input": {
+        "txt": "v=DKIM1; k=rsa; p="
+      },
+      "expect": {
+        "isKey": false
+      }
+    },
+    {
+      "target": "isDkimKey",
+      "name": "rejects unrelated TXT content",
+      "input": {
+        "txt": "v=spf1 -all"
+      },
+      "expect": {
+        "isKey": false
+      }
+    },
+    {
+      "target": "analyzeDkim",
+      "name": "passes when a selector answered",
+      "input": {
+        "found": [
+          "google"
+        ],
+        "probed": 18
+      },
+      "expect": {
+        "id": "dkim-published",
+        "status": "pass"
+      }
+    },
+    {
+      "target": "analyzeDkim",
+      "name": "warns, never fails, when nothing answered",
+      "input": {
+        "found": [],
+        "probed": 18
+      },
+      "expect": {
+        "id": "dkim-absent",
+        "status": "warn"
+      }
+    }
+  ]
+}

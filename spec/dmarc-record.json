@@ -1,0 +1,778 @@
+{
+  "cases": [
+    {
+      "target": "buildDmarcRecord",
+      "name": "writes the shortest record that says something",
+      "input": {
+        "options": {
+          "domain": "acme.com",
+          "policy": "reject"
+        }
+      },
+      "expect": {
+        "record": "v=DMARC1; p=reject"
+      }
+    },
+    {
+      "target": "buildDmarcRecord",
+      "name": "leaves out tags whose value is already the DMARC default",
+      "input": {
+        "options": {
+          "domain": "acme.com",
+          "policy": "reject",
+          "pct": 100,
+          "adkim": "r",
+          "aspf": "r",
+          "ri": 86400,
+          "fo": "0",
+          "subdomainPolicy": "inherit"
+        }
+      },
+      "expect": {
+        "record": "v=DMARC1; p=reject"
+      }
+    },
+    {
+      "target": "buildDmarcRecord",
+      "name": "prefixes report addresses with mailto: and joins them with commas",
+      "input": {
+        "options": {
+          "domain": "acme.com",
+          "policy": "none",
+          "rua": [
+            "d@acme.com",
+            "agg@vendor.example"
+          ]
+        }
+      },
+      "expect": {
+        "record": "v=DMARC1; p=none; rua=mailto:d@acme.com,mailto:agg@vendor.example"
+      }
+    },
+    {
+      "target": "buildDmarcRecord",
+      "name": "emits the tags that differ from the defaults, in order",
+      "input": {
+        "options": {
+          "domain": "acme.com",
+          "policy": "quarantine",
+          "subdomainPolicy": "reject",
+          "pct": 25,
+          "rua": [
+            "d@acme.com"
+          ],
+          "ruf": [
+            "f@acme.com"
+          ],
+          "adkim": "s",
+          "aspf": "s",
+          "ri": 3600,
+          "fo": "1"
+        }
+      },
+      "expect": {
+        "record": "v=DMARC1; p=quarantine; sp=reject; rua=mailto:d@acme.com; ruf=mailto:f@acme.com; adkim=s; aspf=s; pct=25; ri=3600; fo=1"
+      }
+    },
+    {
+      "target": "buildDmarcRecord",
+      "name": "drops fo when there is nowhere to send failure reports",
+      "input": {
+        "options": {
+          "domain": "acme.com",
+          "policy": "reject",
+          "fo": "1"
+        }
+      },
+      "expect": {
+        "record": "v=DMARC1; p=reject"
+      }
+    },
+    {
+      "target": "cleanAddresses",
+      "name": "trims, strips a pasted mailto: and drops duplicates case-insensitively",
+      "input": {
+        "list": [
+          " d@acme.com ",
+          "mailto:D@ACME.COM",
+          "",
+          "f@acme.com"
+        ]
+      },
+      "expect": {
+        "addresses": [
+          "d@acme.com",
+          "f@acme.com"
+        ]
+      }
+    },
+    {
+      "target": "txtChunks",
+      "name": "leaves a short value alone",
+      "input": {
+        "record": "v=DMARC1; p=reject"
+      },
+      "expect": {
+        "chunks": [
+          "v=DMARC1; p=reject"
+        ]
+      }
+    },
+    {
+      "target": "txtChunks",
+      "name": "splits a long value at 255 characters",
+      "input": {
+        "record": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "expect": {
+        "chunks": [
+          "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        ]
+      }
+    },
+    {
+      "target": "parseDmarcRecord",
+      "name": "round-trips a record it wrote itself",
+      "input": {
+        "record": "v=DMARC1; p=quarantine; sp=reject; rua=mailto:d@acme.com; adkim=s; pct=25",
+        "domain": "acme.com"
+      },
+      "expect": {
+        "errorIds": [],
+        "unknown": [],
+        "policy": "quarantine",
+        "subdomainPolicy": "reject",
+        "pct": 25,
+        "rua": [
+          "d@acme.com"
+        ],
+        "ruf": [],
+        "adkim": "s",
+        "aspf": "r"
+      }
+    },
+    {
+      "target": "parseDmarcRecord",
+      "name": "accepts the case, spacing and trailing semicolon receivers accept",
+      "input": {
+        "record": "  V=DMARC1 ;  P=Reject ;  RUA = mailto:D@acme.com ;  ",
+        "domain": "acme.com"
+      },
+      "expect": {
+        "errorIds": [],
+        "unknown": [],
+        "policy": "reject",
+        "rua": [
+          "D@acme.com"
+        ]
+      }
+    },
+    {
+      "target": "parseDmarcRecord",
+      "name": "joins the quoted strings of a record split for DNS",
+      "input": {
+        "record": "\"v=DMARC1; p=reject; \" \"rua=mailto:d@acme.com\"",
+        "domain": "acme.com"
+      },
+      "expect": {
+        "errorIds": [],
+        "policy": "reject",
+        "rua": [
+          "d@acme.com"
+        ]
+      }
+    },
+    {
+      "target": "parseDmarcRecord",
+      "name": "refuses an empty paste",
+      "input": {
+        "record": "   ",
+        "domain": "acme.com"
+      },
+      "expect": {
+        "errorIds": [
+          "empty"
+        ]
+      }
+    },
+    {
+      "target": "parseDmarcRecord",
+      "name": "refuses a record with no version tag",
+      "input": {
+        "record": "p=reject; rua=mailto:d@acme.com",
+        "domain": "acme.com"
+      },
+      "expect": {
+        "errorIds": [
+          "missing-version"
+        ],
+        "policy": "reject"
+      }
+    },
+    {
+      "target": "parseDmarcRecord",
+      "name": "catches a version tag that is not first",
+      "input": {
+        "record": "p=reject; v=DMARC1",
+        "domain": "acme.com"
+      },
+      "expect": {
+        "errorIds": [
+          "version-not-first"
+        ],
+        "policy": "reject"
+      }
+    },
+    {
+      "target": "parseDmarcRecord",
+      "name": "catches a version that is not DMARC1",
+      "input": {
+        "record": "v=DMARC2; p=reject",
+        "domain": "acme.com"
+      },
+      "expect": {
+        "errorIds": [
+          "bad-version"
+        ]
+      }
+    },
+    {
+      "target": "parseDmarcRecord",
+      "name": "catches a missing policy",
+      "input": {
+        "record": "v=DMARC1; rua=mailto:d@acme.com",
+        "domain": "acme.com"
+      },
+      "expect": {
+        "errorIds": [
+          "missing-policy"
+        ]
+      }
+    },
+    {
+      "target": "parseDmarcRecord",
+      "name": "catches values outside the vocabulary",
+      "input": {
+        "record": "v=DMARC1; p=block; sp=maybe; pct=250; adkim=x; fo=z; ri=nope",
+        "domain": "acme.com"
+      },
+      "expect": {
+        "errorIds": [
+          "bad-policy",
+          "bad-subdomain-policy",
+          "bad-pct",
+          "bad-ri",
+          "bad-alignment",
+          "bad-fo"
+        ]
+      }
+    },
+    {
+      "target": "parseDmarcRecord",
+      "name": "reports a repeated tag rather than silently taking the last",
+      "input": {
+        "record": "v=DMARC1; p=none; p=reject",
+        "domain": "acme.com"
+      },
+      "expect": {
+        "errorIds": [
+          "duplicate-tag"
+        ],
+        "policy": "none"
+      }
+    },
+    {
+      "target": "parseDmarcRecord",
+      "name": "reports a fragment that is not a tag=value pair",
+      "input": {
+        "record": "v=DMARC1; p=reject; nonsense",
+        "domain": "acme.com"
+      },
+      "expect": {
+        "errorIds": [
+          "not-a-tag"
+        ]
+      }
+    },
+    {
+      "target": "parseDmarcRecord",
+      "name": "notes a report destination that is missing its mailto:",
+      "input": {
+        "record": "v=DMARC1; p=reject; rua=d@acme.com",
+        "domain": "acme.com"
+      },
+      "expect": {
+        "errorIds": [
+          "missing-mailto"
+        ],
+        "rua": [
+          "d@acme.com"
+        ]
+      }
+    },
+    {
+      "target": "parseDmarcRecord",
+      "name": "rejects a destination that is not an address",
+      "input": {
+        "record": "v=DMARC1; p=reject; rua=mailto:not-an-address",
+        "domain": "acme.com"
+      },
+      "expect": {
+        "errorIds": [
+          "bad-report-address"
+        ],
+        "rua": []
+      }
+    },
+    {
+      "target": "parseDmarcRecord",
+      "name": "keeps the !size suffix out of the address",
+      "input": {
+        "record": "v=DMARC1; p=reject; rua=mailto:d@acme.com!10m",
+        "domain": "acme.com"
+      },
+      "expect": {
+        "errorIds": [],
+        "rua": [
+          "d@acme.com!10m"
+        ]
+      }
+    },
+    {
+      "target": "parseDmarcRecord",
+      "name": "keeps unknown tags out of the options and names them",
+      "input": {
+        "record": "v=DMARC1; p=reject; rf=afrf; unknown=1",
+        "domain": "acme.com"
+      },
+      "expect": {
+        "errorIds": [],
+        "unknown": [
+          "rf",
+          "unknown"
+        ],
+        "policy": "reject"
+      }
+    },
+    {
+      "target": "dmarcGrade",
+      "name": "calls anything at p=none monitoring",
+      "input": {
+        "options": {
+          "policy": "none",
+          "pct": 100
+        }
+      },
+      "expect": {
+        "grade": "monitor"
+      }
+    },
+    {
+      "target": "dmarcGrade",
+      "name": "calls quarantine partial",
+      "input": {
+        "options": {
+          "policy": "quarantine",
+          "pct": 100
+        }
+      },
+      "expect": {
+        "grade": "partial"
+      }
+    },
+    {
+      "target": "dmarcGrade",
+      "name": "calls sampled rejection partial",
+      "input": {
+        "options": {
+          "policy": "reject",
+          "pct": 50
+        }
+      },
+      "expect": {
+        "grade": "partial"
+      }
+    },
+    {
+      "target": "dmarcGrade",
+      "name": "calls full rejection enforcing",
+      "input": {
+        "options": {
+          "policy": "reject",
+          "pct": 100
+        }
+      },
+      "expect": {
+        "grade": "enforcing"
+      }
+    },
+    {
+      "target": "reviewDmarc",
+      "name": "treats enforcing with no report address as the serious case",
+      "input": {
+        "options": {
+          "domain": "acme.com",
+          "policy": "reject"
+        }
+      },
+      "expect": {
+        "noteIds": [
+          "no-rua"
+        ],
+        "highIds": [
+          "no-rua"
+        ]
+      }
+    },
+    {
+      "target": "reviewDmarc",
+      "name": "says p=none delivers the forgery",
+      "input": {
+        "options": {
+          "domain": "acme.com",
+          "policy": "none",
+          "rua": [
+            "d@acme.com"
+          ]
+        }
+      },
+      "expect": {
+        "noteIds": [
+          "monitor-only"
+        ]
+      }
+    },
+    {
+      "target": "reviewDmarc",
+      "name": "flags a subdomain policy weaker than the domain's",
+      "input": {
+        "options": {
+          "domain": "acme.com",
+          "policy": "reject",
+          "subdomainPolicy": "none",
+          "rua": [
+            "d@acme.com"
+          ]
+        }
+      },
+      "expect": {
+        "noteIds": [
+          "sp-weaker",
+          "at-destination"
+        ],
+        "highIds": [
+          "sp-weaker"
+        ]
+      }
+    },
+    {
+      "target": "reviewDmarc",
+      "name": "does not flag a subdomain policy stricter than the domain's",
+      "input": {
+        "options": {
+          "domain": "acme.com",
+          "policy": "quarantine",
+          "subdomainPolicy": "reject",
+          "rua": [
+            "d@acme.com"
+          ]
+        }
+      },
+      "expect": {
+        "noteIds": []
+      }
+    },
+    {
+      "target": "reviewDmarc",
+      "name": "calls pct inert under p=none",
+      "input": {
+        "options": {
+          "domain": "acme.com",
+          "policy": "none",
+          "pct": 25,
+          "rua": [
+            "d@acme.com"
+          ]
+        }
+      },
+      "expect": {
+        "noteIds": [
+          "monitor-only",
+          "pct-under-none"
+        ]
+      }
+    },
+    {
+      "target": "reviewDmarc",
+      "name": "calls pct a sample under enforcement",
+      "input": {
+        "options": {
+          "domain": "acme.com",
+          "policy": "reject",
+          "pct": 25,
+          "rua": [
+            "d@acme.com"
+          ]
+        }
+      },
+      "expect": {
+        "noteIds": [
+          "pct-partial"
+        ]
+      }
+    },
+    {
+      "target": "reviewDmarc",
+      "name": "warns about strict alignment and about failure reports",
+      "input": {
+        "options": {
+          "domain": "acme.com",
+          "policy": "reject",
+          "rua": [
+            "d@acme.com"
+          ],
+          "ruf": [
+            "f@acme.com"
+          ],
+          "adkim": "s"
+        }
+      },
+      "expect": {
+        "noteIds": [
+          "strict-alignment",
+          "ruf-privacy",
+          "at-destination"
+        ]
+      }
+    },
+    {
+      "target": "reviewDmarc",
+      "name": "calls fo inert without a ruf destination",
+      "input": {
+        "options": {
+          "domain": "acme.com",
+          "policy": "reject",
+          "rua": [
+            "d@acme.com"
+          ],
+          "fo": "1"
+        }
+      },
+      "expect": {
+        "noteIds": [
+          "fo-without-ruf",
+          "at-destination"
+        ]
+      }
+    },
+    {
+      "target": "reviewDmarc",
+      "name": "warns when more than two destinations are asked for",
+      "input": {
+        "options": {
+          "domain": "acme.com",
+          "policy": "reject",
+          "rua": [
+            "a@acme.com",
+            "b@acme.com",
+            "c@acme.com"
+          ]
+        }
+      },
+      "expect": {
+        "noteIds": [
+          "many-rua",
+          "at-destination"
+        ]
+      }
+    },
+    {
+      "target": "reviewDmarc",
+      "name": "names a third-party report destination as needing authorization",
+      "input": {
+        "options": {
+          "domain": "acme.com",
+          "policy": "reject",
+          "rua": [
+            "d@acme.com",
+            "agg@vendor.example"
+          ]
+        }
+      },
+      "expect": {
+        "noteIds": [
+          "external-reports",
+          "at-destination"
+        ]
+      }
+    },
+    {
+      "target": "reviewDmarc",
+      "name": "confirms the finished state",
+      "input": {
+        "options": {
+          "domain": "acme.com",
+          "policy": "reject",
+          "rua": [
+            "d@acme.com"
+          ]
+        }
+      },
+      "expect": {
+        "noteIds": [
+          "at-destination"
+        ]
+      }
+    },
+    {
+      "target": "reviewDmarc",
+      "name": "warns when the value outgrows a single DNS string",
+      "input": {
+        "options": {
+          "domain": "acme.com",
+          "policy": "reject",
+          "rua": [
+            "team0@acme.com",
+            "team1@acme.com",
+            "team2@acme.com",
+            "team3@acme.com",
+            "team4@acme.com",
+            "team5@acme.com",
+            "team6@acme.com",
+            "team7@acme.com",
+            "team8@acme.com",
+            "team9@acme.com",
+            "team10@acme.com",
+            "team11@acme.com",
+            "team12@acme.com",
+            "team13@acme.com"
+          ]
+        }
+      },
+      "expect": {
+        "hasNote": "long-record"
+      }
+    },
+    {
+      "target": "externalDestinations",
+      "name": "ignores addresses on the domain itself and its subdomains",
+      "input": {
+        "options": {
+          "domain": "acme.com",
+          "policy": "reject",
+          "rua": [
+            "d@acme.com",
+            "d@mail.acme.com"
+          ]
+        }
+      },
+      "expect": {
+        "destinations": []
+      }
+    },
+    {
+      "target": "externalDestinations",
+      "name": "names the authorization record a third-party destination needs",
+      "input": {
+        "options": {
+          "domain": "acme.com",
+          "policy": "reject",
+          "rua": [
+            "agg@vendor.example"
+          ],
+          "ruf": [
+            "f@vendor.example"
+          ]
+        }
+      },
+      "expect": {
+        "destinations": [
+          {
+            "domain": "vendor.example",
+            "host": "acme.com._report._dmarc.vendor.example",
+            "value": "v=DMARC1"
+          }
+        ]
+      }
+    },
+    {
+      "target": "externalDestinations",
+      "name": "has nothing to say until the domain is known",
+      "input": {
+        "options": {
+          "domain": "",
+          "policy": "reject",
+          "rua": [
+            "agg@vendor.example"
+          ]
+        }
+      },
+      "expect": {
+        "destinations": []
+      }
+    },
+    {
+      "target": "rollout",
+      "name": "keeps the reporting choices at every stage and moves only the policy",
+      "input": {
+        "options": {
+          "domain": "acme.com",
+          "policy": "none",
+          "rua": [
+            "d@acme.com"
+          ],
+          "adkim": "s"
+        }
+      },
+      "expect": {
+        "records": [
+          "v=DMARC1; p=none; rua=mailto:d@acme.com; adkim=s",
+          "v=DMARC1; p=quarantine; rua=mailto:d@acme.com; adkim=s; pct=25",
+          "v=DMARC1; p=quarantine; rua=mailto:d@acme.com; adkim=s",
+          "v=DMARC1; p=reject; rua=mailto:d@acme.com; adkim=s"
+        ],
+        "currentKeys": [
+          "monitor"
+        ]
+      }
+    },
+    {
+      "target": "rollout",
+      "name": "marks the stage a sampled quarantine sits at",
+      "input": {
+        "options": {
+          "domain": "acme.com",
+          "policy": "quarantine",
+          "pct": 25,
+          "rua": [
+            "d@acme.com"
+          ]
+        }
+      },
+      "expect": {
+        "currentKeys": [
+          "quarantine-sample"
+        ]
+      }
+    },
+    {
+      "target": "rollout",
+      "name": "marks the finished stage",
+      "input": {
+        "options": {
+          "domain": "acme.com",
+          "policy": "reject",
+          "rua": [
+            "d@acme.com"
+          ]
+        }
+      },
+      "expect": {
+        "currentKeys": [
+          "reject"
+        ]
+      }
+    }
+  ]
+}
