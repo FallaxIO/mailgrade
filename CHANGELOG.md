@@ -1,0 +1,79 @@
+# mailgrade
+
+## 0.2.0
+
+### Minor Changes
+
+- [`9c80dd2`](https://github.com/FallaxIO/mailgrade/commit/9c80dd2ff9abb7c037a70d770823999fdad7c02c) Thanks [@IgnaceMaes](https://github.com/IgnaceMaes)! - Fix relaxed DMARC alignment under registry-operated second-level domains, and
+  let a caller supply the real Public Suffix List.
+  
+  The built-in suffix rules were a fixed list of 42 two-label pairs. A pair not
+  on it — `gov.uk`, `ac.jp`, `org.cn`, `com.ec` — collapsed every host under it
+  to the pair itself, so `dept.gov.uk` and `attacker.gov.uk` shared an
+  organizational domain and relaxed alignment reported them as aligned. In
+  `mailgrade/verify` that is a DMARC pass for a signature the From domain's
+  owner never made.
+  
+  - The suffix rules now treat the registry's own labels (`co`, `com`, `gov`,
+    `ac`, `org`, `ne`, `sch`, …) as part of the suffix under any country code,
+    rather than only for enumerated pairs. The remaining approximation errs
+    toward reading a host as more specific than it is, which under-reports
+    alignment instead of over-reporting it.
+  - `registrableDomain`, `domainLabel` and `aligns` take an optional
+    `{ publicSuffixes }`, and `verifyDmarc` and `verifyMessage` accept and
+    forward it. Supplying a list replaces the built-in rules entirely: the
+    longest entry matching a host's tail is its public suffix. Pass the ICANN
+    section of the real PSL where a wrong alignment decision has a cost.
+
+- [`194029a`](https://github.com/FallaxIO/mailgrade/commit/194029ace58854252841baef8734b82b1f1d3372) - First release.
+  
+  Grade a domain's SPF, DMARC and DKIM configuration, build and review DMARC
+  records, and analyse a pasted header block. Zero runtime dependencies, no
+  network code outside the optional `mailgrade/doh` entry point, and a
+  language-neutral conformance corpus in `spec/` so the rules can be ported.
+
+- [`9c80dd2`](https://github.com/FallaxIO/mailgrade/commit/9c80dd2ff9abb7c037a70d770823999fdad7c02c) Thanks [@IgnaceMaes](https://github.com/IgnaceMaes)! - Add `mailgrade/node-dns`, a `Resolver` backed by `node:dns`.
+  
+  `nodeResolver()` resolves through the system resolver rather than a public
+  DoH endpoint, which a service that does not want every lookup leaving the
+  process (or that is grading domains in bulk against a rate-limited resolver)
+  now gets without writing the adapter itself. It does the mapping the
+  `Resolver` contract needs and that is easy to get wrong by hand: NXDOMAIN and
+  ENODATA answer `[]` rather than throwing (a throw would be read as
+  `temperror` where `fail` is correct), TXT chunks are rejoined, and MX answers
+  are reduced to bare host names. `{ servers, timeout, tries }` build a
+  dedicated `dns.Resolver`, never touching process-wide DNS configuration.
+  
+  `node:dns` is imported only by this entry point, and only on the first
+  lookup, so `mailgrade`, `mailgrade/verify` and `mailgrade/doh` stay loadable
+  in Workers and browsers.
+
+- [`9c80dd2`](https://github.com/FallaxIO/mailgrade/commit/9c80dd2ff9abb7c037a70d770823999fdad7c02c) Thanks [@IgnaceMaes](https://github.com/IgnaceMaes)! - New `mailgrade/verify` entry point: real message verification, still at zero
+  dependencies, still running anywhere WebCrypto and `fetch` do.
+  
+  - `verifySpf` evaluates a policy against a connecting IP per RFC 7208:
+    every mechanism, the macro language, redirects, exp= explanations, and the
+    limits receivers enforce (10 lookups, 2 void lookups, 10 MX hosts).
+  - `verifyDkim` verifies DKIM signatures with WebCrypto: rsa-sha256 and
+    ed25519-sha256, simple and relaxed canonicalization, l= body lengths, and
+    the RFC 8301 refusals (rsa-sha1, RSA keys under 1024 bits).
+  - `verifyDmarc` discovers the policy with the org-domain fallback and applies
+    strict or relaxed alignment; `verifyMessage` runs all three on a raw message.
+  - DNS is injected through a `Resolver`: `dohResolver()` (new, in
+    `mailgrade/doh`) needs nothing but `fetch`, and `staticResolver(zone)`
+    makes tests and offline evaluation trivial.
+  - `toAuthResults` renders a verification as an RFC 8601
+    Authentication-Results header value, ready to stamp onto the message,
+    and readable back by `analyzeHeaders`.
+  - `checkDomain` and `resolveDomain` accept the same `resolver` option, so a
+    Node service can grade domains over `node:dns` instead of DoH.
+  
+  Fixes in the grader:
+  
+  - `analyzeSpf` now grades the **first** `all` mechanism rather than the last
+    one, matching how receivers evaluate a record: in `"v=spf1 ?all -all"` the
+    `-all` is dead code and the record is neutral.
+  - `mailProvider` matches MX hosts by domain suffix instead of substring, so
+    lookalike hosts no longer name the wrong provider.
+  - `isDomainName` accepts punycode TLDs, so IDN domains take part in alignment
+    checks instead of being skipped.
