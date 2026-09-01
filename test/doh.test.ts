@@ -4,7 +4,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { checkDomain, DnsError, resolveDomain, type FetchLike } from "../src/doh.ts";
+import { gradeDomain, DnsError, resolveDomain, type FetchLike } from "../src/doh.ts";
 import { staticResolver } from "../src/verify/resolver.ts";
 
 type Zone = Record<string, { status?: number; answers?: [number, string][] }>;
@@ -136,7 +136,7 @@ describe("resolveDomain", () => {
 
 describe("bring your own DNS", () => {
   it("routes every lookup through an injected resolver instead of DoH", async () => {
-    const grade = await checkDomain("acme.com", {
+    const grade = await gradeDomain("acme.com", {
       selectors: ["google"],
       fetch: httpFailure, // proves fetch is never touched
       resolver: staticResolver({
@@ -154,9 +154,9 @@ describe("bring your own DNS", () => {
   });
 });
 
-describe("checkDomain", () => {
+describe("gradeDomain", () => {
   it("resolves and grades in one call", async () => {
-    const grade = await checkDomain("acme.com", {
+    const grade = await gradeDomain("acme.com", {
       selectors: ["google"],
       fetch: stubFetch({
         "TXT acme.com": { answers: [[TXT, '"v=spf1 include:_spf.google.com -all"']] },

@@ -10,6 +10,7 @@
 import { aligns, registrableDomain, type SuffixOptions } from "../domain.ts";
 import { dmarcHost, isDmarcRecord } from "../dmarc/analyze.ts";
 import { parseDmarcRecord, type Alignment, type DmarcPolicy } from "../dmarc/record.ts";
+import { defaultResolver } from "../doh-resolver.ts";
 import type { Resolver } from "./resolver.ts";
 import type { DkimVerification } from "./dkim.ts";
 import type { SpfVerification } from "./spf.ts";
@@ -37,7 +38,8 @@ export type DmarcParams = {
   readonly spf?: Pick<SpfVerification, "result" | "domain"> | null;
   /** One outcome per DKIM signature. */
   readonly dkim?: readonly Pick<DkimVerification, "result" | "domain">[];
-  readonly resolver: Resolver;
+  /** Where DNS comes from. Defaults to DNS over HTTPS against Cloudflare. */
+  readonly resolver?: Resolver;
 } & SuffixOptions;
 
 function identityAligns(
@@ -55,6 +57,7 @@ function identityAligns(
 export async function verifyDmarc(params: DmarcParams): Promise<DmarcVerification> {
   const fromDomain = params.fromDomain.trim().toLowerCase();
   const org = registrableDomain(fromDomain, params);
+  const resolve = params.resolver ?? defaultResolver();
 
   const blank: DmarcVerification = {
     result: "none",
@@ -73,7 +76,7 @@ export async function verifyDmarc(params: DmarcParams): Promise<DmarcVerificatio
   let record: string | null = null;
   let source: string | null = null;
   try {
-    const atDomain = (await params.resolver(dmarcHost(fromDomain), "TXT")).filter(
+    const atDomain = (await resolve(dmarcHost(fromDomain), "TXT")).filter(
       isDmarcRecord,
     );
     // Exactly one record is a policy; several are a void, per the RFC.
@@ -81,7 +84,7 @@ export async function verifyDmarc(params: DmarcParams): Promise<DmarcVerificatio
       record = atDomain[0] as string;
       source = fromDomain;
     } else if (atDomain.length === 0 && org && org !== fromDomain) {
-      const atOrg = (await params.resolver(dmarcHost(org), "TXT")).filter(
+      const atOrg = (await resolve(dmarcHost(org), "TXT")).filter(
         isDmarcRecord,
       );
       if (atOrg.length === 1) {

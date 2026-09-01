@@ -24,7 +24,7 @@ import {
 } from "../src/dmarc/record.ts";
 import { dmarcGrade, reviewDmarc, rolloutPlan } from "../src/dmarc/review.ts";
 import { aligns, coerceDomain, registrableDomain } from "../src/domain.ts";
-import { gradeDomain, type DomainRecords } from "../src/grade.ts";
+import { gradeRecords, type DomainRecords } from "../src/grade.ts";
 import { analyzeHeaders } from "../src/headers/analyze.ts";
 import { detectImpersonation, editDistance } from "../src/headers/impersonation.ts";
 import {
@@ -59,7 +59,7 @@ const PROJECT: Record<string, (i: Record<string, any>) => unknown> = {
   aligns: (i) => ({ aligns: aligns(i["a"], i["b"]) }),
 
   analyzeSpf: (i) => {
-    const r = gradeDomain({ domain: "x.example", txt: i["txt"], dmarc: [] }).spf;
+    const r = gradeRecords({ domain: "x.example", txt: i["txt"], dmarc: [] }).spf;
     return {
       id: r.id,
       status: r.status,
@@ -118,10 +118,11 @@ const PROJECT: Record<string, (i: Record<string, any>) => unknown> = {
     };
   },
 
-  gradeDomain: (i) => {
-    const g = gradeDomain(i as DomainRecords);
+  gradeRecords: (i) => {
+    const g = gradeRecords(i as DomainRecords);
     return {
       verdict: g.verdict,
+      letter: g.letter,
       spfId: g.spf.id,
       dmarcId: g.dmarc.id,
       dkimId: g.dkim.id,

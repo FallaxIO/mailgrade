@@ -1,7 +1,7 @@
 {
   "name": "mailgrade",
   "version": "1.0.0",
-  "description": "Grade a domain's SPF, DMARC and DKIM. Zero dependencies, no network, runs anywhere.",
+  "description": "Grade and verify SPF, DMARC and DKIM. One call or `npx mailgrade <domain>`, no setup, zero dependencies, runs anywhere.",
   "keywords": [
     "dmarc",
     "spf",
@@ -12,11 +12,15 @@
     "phishing",
     "dns",
     "deliverability",
-    "email-headers"
+    "email-headers",
+    "cli"
   ],
   "license": "MIT",
-  "author": "Fallax",
-  "homepage": "https://github.com/FallaxIO/mailgrade#readme",
+  "author": {
+    "name": "Fallax",
+    "url": "https://fallax.io"
+  },
+  "homepage": "https://fallax.io/mailgrade",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/FallaxIO/mailgrade.git"
@@ -28,9 +32,11 @@
     "node": ">=20"
   },
   "files": [
-    "dist",
-    "spec"
+    "dist"
   ],
+  "bin": {
+    "mailgrade": "./dist/cli.js"
+  },
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -125,7 +131,6 @@
         "default": "./dist/node-dns.cjs"
       }
     },
-    "./spec/*": "./spec/*",
     "./package.json": "./package.json"
   },
   "scripts": {

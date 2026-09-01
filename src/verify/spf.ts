@@ -9,6 +9,7 @@
  */
 
 import { macroIp, parseIp, readableIp, reverseName, inCidr, type ParsedIp } from "./ip.ts";
+import { defaultResolver } from "../doh-resolver.ts";
 import type { Resolver } from "./resolver.ts";
 
 export type SpfResult =
@@ -42,7 +43,8 @@ export type SpfParams = {
   readonly helo?: string;
   /** Receiving host name, used by the %{r} macro. */
   readonly receiver?: string;
-  readonly resolver: Resolver;
+  /** Where DNS comes from. Defaults to DNS over HTTPS against Cloudflare. */
+  readonly resolver?: Resolver;
 };
 
 const LOOKUP_LIMIT = 10;
@@ -100,7 +102,7 @@ export async function verifySpf(params: SpfParams): Promise<SpfVerification> {
   if (!senderDomain || !senderDomain.includes(".")) return blank("none");
 
   const ctx: Context = {
-    resolver: params.resolver,
+    resolver: params.resolver ?? defaultResolver(),
     ip,
     sender: `${local}@${senderDomain}`,
     local,

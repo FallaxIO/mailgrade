@@ -3,6 +3,7 @@ import { defineConfig, type UserConfig } from "tsdown";
 const config: UserConfig = defineConfig({
   entry: [
     "src/index.ts",
+    "src/cli.ts",
     "src/spf.ts",
     "src/dkim.ts",
     "src/domain.ts",

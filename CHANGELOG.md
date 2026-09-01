@@ -6,7 +6,7 @@
 
 - [`e576838`](https://github.com/FallaxIO/mailgrade/commit/e576838dc1c305406f755bb4b8cb8aa3d58e2b02) Thanks [@IgnaceMaes](https://github.com/IgnaceMaes)! - First stable release.
   
-  No API changes from 0.2.0 — this marks the surface as settled and brings it
+  No API changes from 0.2.0; this marks the surface as settled and brings it
   under semver: the grading, verification, DMARC record and header-analysis
   entry points will not break without a major bump.
   
@@ -21,17 +21,17 @@
   let a caller supply the real Public Suffix List.
   
   The built-in suffix rules were a fixed list of 42 two-label pairs. A pair not
-  on it — `gov.uk`, `ac.jp`, `org.cn`, `com.ec` — collapsed every host under it
+  on it (`gov.uk`, `ac.jp`, `org.cn`, `com.ec`) collapsed every host under it
   to the pair itself, so `dept.gov.uk` and `attacker.gov.uk` shared an
   organizational domain and relaxed alignment reported them as aligned. In
   `mailgrade/verify` that is a DMARC pass for a signature the From domain's
   owner never made.
   
   - The suffix rules now treat the registry's own labels (`co`, `com`, `gov`,
-    `ac`, `org`, `ne`, `sch`, …) as part of the suffix under any country code,
-    rather than only for enumerated pairs. The remaining approximation errs
-    toward reading a host as more specific than it is, which under-reports
-    alignment instead of over-reporting it.
+    `ac`, `org`, `ne`, `sch`, and so on) as part of the suffix under any
+    country code, rather than only for enumerated pairs. The remaining
+    approximation errs toward reading a host as more specific than it is,
+    which under-reports alignment instead of over-reporting it.
   - `registrableDomain`, `domainLabel` and `aligns` take an optional
     `{ publicSuffixes }`, and `verifyDmarc` and `verifyMessage` accept and
     forward it. Supplying a list replaces the built-in rules entirely: the

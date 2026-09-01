@@ -53,7 +53,7 @@ finished when all of them pass.
 | `dkim.json` | DKIM key detection and grading |
 | `dmarc-lookup.json` | grading a published DMARC record |
 | `dmarc-record.json` | building, parsing, reviewing and rolling out a record |
-| `grade.json` | the whole-domain verdict and its recommendations |
+| `grade.json` | the whole-domain verdict, its letter grade and its recommendations |
 | `spf-eval.json` | RFC 7208 evaluation: mechanisms, macros, limits, exp= |
 | `headers.json` | header parsing, authentication results, impersonation |
 
