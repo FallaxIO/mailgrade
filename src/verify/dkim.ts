@@ -8,6 +8,7 @@
  * never costs a lookup.
  */
 
+import { defaultResolver } from "../doh-resolver.ts";
 import type { Resolver } from "./resolver.ts";
 import {
   canonicalBodyRelaxed,
@@ -56,7 +57,8 @@ export type DkimVerification = {
 };
 
 export type DkimVerifyOptions = {
-  readonly resolver: Resolver;
+  /** Where DNS comes from. Defaults to DNS over HTTPS against Cloudflare. */
+  readonly resolver?: Resolver;
   /** The clock to judge x= expiry against; defaults to now. */
   readonly now?: Date;
 };
@@ -312,7 +314,10 @@ async function verifySignature(
 
   let keyRecords: readonly string[];
   try {
-    keyRecords = await options.resolver(`${selector}._domainkey.${domain}`, "TXT");
+    keyRecords = await (options.resolver ?? defaultResolver())(
+      `${selector}._domainkey.${domain}`,
+      "TXT",
+    );
   } catch {
     return finish(verdict("dkim-dns-error"));
   }

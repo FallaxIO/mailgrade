@@ -1,5 +1,9 @@
 /**
- * The headline call: everything a domain publishes, in one verdict.
+ * Grading, given records somebody else fetched.
+ *
+ * `gradeDomain` in `mailgrade/doh` is this composed with the lookups; this is
+ * the half that is pure, so a caller who already holds the DNS answers (a
+ * cache, a bulk job, a fixture) never pays for a second round trip.
  *
  * The grade answers "how far does mail claiming to be this domain get", which
  * is why DMARC policy decides the verdict and SPF and DKIM decide whether that
@@ -13,6 +17,8 @@ import { analyzeSpf, type SpfAnalysis } from "./spf.ts";
 import type { Recommendation } from "./types.ts";
 
 export type DomainVerdict = "spoofable" | "partial" | "protected";
+
+export type GradeLetter = "A+" | "A" | "B" | "C" | "D" | "F";
 
 /** Raw DNS answers, however the caller obtained them. */
 export type DomainRecords = {
@@ -33,6 +39,8 @@ export type DomainRecords = {
 export type DomainGrade = {
   readonly domain: string;
   readonly verdict: DomainVerdict;
+  /** The verdict as a report card, from A+ down to F. */
+  readonly letter: GradeLetter;
   readonly spf: SpfAnalysis;
   readonly dmarc: DmarcAnalysis;
   readonly dkim: DkimAnalysis;
@@ -55,25 +63,82 @@ export function domainVerdict(
   return "protected";
 }
 
-export function gradeDomain(records: DomainRecords): DomainGrade {
+export function gradeRecords(records: DomainRecords): DomainGrade {
   const domain = records.domain.trim().toLowerCase();
-  const mxHosts = records.mx ?? [];
+  // RFC 7505: a null MX ("MX 0 .") is a deliberate "this domain takes no
+  // mail", and arrives as "." or, root dot stripped, as "". Neither is a mail
+  // host, and treating one as a mail host would tell a no-mail domain to turn
+  // on DKIM.
+  const mxHosts = (records.mx ?? []).filter((h) => h !== "" && h !== ".");
   const spf = analyzeSpf(records.txt);
   const dmarc = analyzeDmarc(records.dmarc, records.dmarcSource ?? domain);
   const dkim = analyzeDkim(
     records.dkimSelectors ?? [],
     records.dkimProbed ?? DKIM_SELECTORS.length,
   );
+  const verdict = domainVerdict(spf, dmarc);
+  const parked = looksParked(spf, mxHosts);
 
   return {
     domain,
-    verdict: domainVerdict(spf, dmarc),
+    verdict,
+    letter: letterFor(verdict, spf, dmarc, dkim, parked),
     spf,
     dmarc,
     dkim,
     mx: { hosts: mxHosts, provider: mailProvider(mxHosts) },
-    recommendations: recommend(domain, spf, dmarc, dkim, mxHosts),
+    recommendations: recommend(domain, spf, dmarc, dkim, parked),
   };
+}
+
+/**
+ * No MX and either no SPF or a bare "v=spf1 -all" reads as a domain that
+ * does not do mail, so advice about signing and providers would be noise,
+ * and absent DKIM is not held against the grade.
+ */
+function looksParked(spf: SpfAnalysis, mxHosts: readonly string[]): boolean {
+  return (
+    mxHosts.length === 0 &&
+    (spf.record === null || /^v=spf1\s+-all$/i.test(spf.record.trim()))
+  );
+}
+
+/**
+ * The verdict as a report card. The verdict sets the band and the details
+ * move within it:
+ *
+ * - `F`: spoofable with nothing effective published, or an SPF `+all`,
+ *   which actively authorises the spoof.
+ * - `D`: spoofable, but something is in place (a monitoring-only DMARC, or
+ *   decent SPF with no DMARC behind it).
+ * - `C`: partial enforcement: quarantine, a sampled reject, or a weaker
+ *   subdomain policy.
+ * - `B`: enforcing, but SPF is broken or missing, or a sending domain shows
+ *   no DKIM keys, so enforcement rests on fewer legs than it should.
+ * - `A`: enforcing, with SPF and DKIM both standing behind it.
+ * - `A+`: as `A`, with SPF ending in `-all` and aggregate reports flowing
+ *   somewhere (`rua=`), so drift will be noticed.
+ */
+function letterFor(
+  verdict: DomainVerdict,
+  spf: SpfAnalysis,
+  dmarc: DmarcAnalysis,
+  dkim: DkimAnalysis,
+  parked: boolean,
+): GradeLetter {
+  if (verdict === "partial") return "C";
+
+  if (verdict === "spoofable") {
+    if (spf.id === "spf-allow-all") return "F";
+    if (dmarc.record === null && spf.status === "fail") return "F";
+    return "D";
+  }
+
+  const spfBroken = spf.status === "fail";
+  const unsignedSender = dkim.selectorsFound.length === 0 && !parked;
+  if (spfBroken || unsignedSender) return "B";
+
+  return spf.id === "spf-hardfail" && dmarc.reporting ? "A+" : "A";
 }
 
 function recommend(
@@ -81,15 +146,9 @@ function recommend(
   spf: SpfAnalysis,
   dmarc: DmarcAnalysis,
   dkim: DkimAnalysis,
-  mxHosts: readonly string[],
+  sendsNothing: boolean,
 ): Recommendation[] {
   const recs: Recommendation[] = [];
-
-  // No MX and either no SPF or a bare "v=spf1 -all" reads as a domain that
-  // does not do mail, so advice about signing and providers would be noise.
-  const sendsNothing =
-    mxHosts.length === 0 &&
-    (spf.record === null || /^v=spf1\s+-all$/i.test(spf.record.trim()));
 
   if (sendsNothing && (spf.record === null || dmarc.status !== "pass")) {
     recs.push({

@@ -15,66 +15,40 @@ import * as dkim from "../src/dkim.ts";
 import * as domain from "../src/domain.ts";
 import * as verify from "../src/verify/index.ts";
 import * as nodeDns from "../src/node-dns.ts";
+import * as doh from "../src/doh.ts";
 
 const names = (m: object) => Object.keys(m).toSorted();
 
 describe("entry points", () => {
-  it("exposes the headline call and the pieces it is made of", () => {
+  it("exposes the documented API, and only that", () => {
     expect(names(root)).toEqual([
-      "DEFAULT_OPTIONS",
-      "DEFAULT_RI",
       "DKIM_SELECTORS",
-      "DMARC_TAGS",
-      "IMPERSONATED_DOMAINS",
-      "INVISIBLE",
+      "DnsError",
       "aligns",
       "analyzeDkim",
       "analyzeDmarc",
       "analyzeHeaders",
       "analyzeSpf",
-      "blankCheck",
       "buildDmarcRecord",
-      "cleanAddresses",
+      "gradeDomain",
       "coerceDomain",
-      "decodeEncodedWords",
-      "detectImpersonation",
-      "dkimCheck",
       "dkimHost",
-      "dmarcCheck",
-      "dmarcGrade",
       "dmarcHost",
-      "domainLabel",
+      "dohResolver",
       "domainOf",
       "domainVerdict",
-      "editDistance",
-      "externalDestinations",
-      "gradeDomain",
-      "hasMixedScript",
-      "headerValue",
-      "headerValues",
-      "headerVerdict",
-      "identifierDomain",
+      "gradeRecords",
       "isDkimKey",
       "isDmarcRecord",
-      "isDomainName",
-      "isPrivateIp",
       "isSpfRecord",
       "mailProvider",
-      "parseAddress",
-      "parseAuthResults",
       "parseDmarcRecord",
-      "parseHeaders",
-      "parseReceived",
       "registrableDomain",
-      "reportDomain",
-      "recordTags",
+      "resolveDomain",
       "reviewDmarc",
       "rolloutPlan",
-      "spfCheck",
       "staticResolver",
-      "stripComments",
       "toAuthResults",
-      "txtChunks",
       "verifyDkim",
       "verifyDmarc",
       "verifyMessage",
@@ -101,18 +75,56 @@ describe("entry points", () => {
       "verifyMessage",
       "verifySpf",
     ]);
+    expect(names(doh)).toEqual([
+      "DEFAULT_ENDPOINT",
+      "DnsError",
+      "defaultResolver",
+      "dohResolver",
+      "gradeDomain",
+      "resolveDomain",
+    ]);
   });
 
   it("exposes the Node resolver only from its own entry point", () => {
     expect(names(nodeDns)).toEqual(["nodeResolver"]);
-    for (const module of [root, spf, dkim, domain, dmarc, headers, verify]) {
+    for (const module of [root, spf, dkim, domain, dmarc, headers, verify, doh]) {
       expect(names(module)).not.toContain("nodeResolver");
     }
   });
 
-  it("keeps the network code out of every entry point but its own", () => {
-    for (const module of [root, spf, dkim, domain, dmarc, headers, verify]) {
-      expect(names(module)).not.toContain("checkDomain");
+  // The headline calls belong on the headline import: a reader reaching for
+  // this library types `mailgrade`, not `mailgrade/doh`. What has to stay out
+  // of the root is `node:`, which is a bundler problem rather than a taste
+  // one, and that is pinned separately below.
+  it("puts the headline calls on the root import", () => {
+    expect(names(root)).toContain("gradeDomain");
+    expect(names(root)).toContain("verifyMessage");
+    expect(names(root)).toContain("analyzeHeaders");
+  });
+
+  // The root is curated by hand, so this is the test that notices when
+  // somebody reaches for `export *` again and the surface doubles.
+  it("keeps the helpers off the root and on their own entry point", () => {
+    for (const name of [
+      "blankCheck",
+      "editDistance",
+      "headerValue",
+      "parseHeaders",
+      "spfCheck",
+      "stripComments",
+      "txtChunks",
+    ]) {
+      expect(names(root)).not.toContain(name);
+    }
+    expect(names(headers)).toContain("blankCheck");
+    expect(names(headers)).toContain("editDistance");
+    expect(names(headers)).toContain("parseHeaders");
+    expect(names(dmarc)).toContain("txtChunks");
+  });
+
+  it("keeps the network code out of the entry points that promise none", () => {
+    for (const module of [spf, dkim, domain, dmarc, headers]) {
+      expect(names(module)).not.toContain("gradeDomain");
       expect(names(module)).not.toContain("resolveDomain");
       expect(names(module)).not.toContain("dohResolver");
     }

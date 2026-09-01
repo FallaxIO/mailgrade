@@ -24,6 +24,8 @@ export type DmarcAnalysis = {
   readonly status: Status;
   readonly record: string | null;
   readonly policy: DmarcPolicy | null;
+  /** Whether the record requests aggregate reports (a rua= tag). */
+  readonly reporting: boolean;
   /** Host the record was found at; the org domain when a subdomain inherited it. */
   readonly source: string | null;
   readonly headline: string;
@@ -69,6 +71,7 @@ export function analyzeDmarc(
       status: "fail",
       record: null,
       policy: null,
+      reporting: false,
       source: null,
       headline: "No DMARC record",
       detail:
@@ -82,6 +85,7 @@ export function analyzeDmarc(
       status: "fail",
       record: records.join("  |  "),
       policy: null,
+      reporting: false,
       source,
       headline: "Multiple DMARC records",
       detail:
@@ -92,6 +96,7 @@ export function analyzeDmarc(
   const record = records[0] as string;
   const tags = dmarcTags(record);
   const policyTag = tags.get("p")?.toLowerCase();
+  const reporting = tags.has("rua");
 
   if (
     policyTag !== "none" &&
@@ -100,6 +105,7 @@ export function analyzeDmarc(
   ) {
     return {
       id: "dmarc-no-policy",
+      reporting,
       status: "fail",
       record,
       policy: null,
@@ -123,6 +129,7 @@ export function analyzeDmarc(
   if (policyTag === "none") {
     return {
       id: "dmarc-monitor",
+      reporting,
       status: "fail",
       record,
       policy: "none",
@@ -137,6 +144,7 @@ export function analyzeDmarc(
   if (policyTag === "quarantine") {
     return {
       id: "dmarc-quarantine",
+      reporting,
       status: "warn",
       record,
       policy: "quarantine",
@@ -151,6 +159,7 @@ export function analyzeDmarc(
   if (pct < 100) {
     return {
       id: "dmarc-sampled",
+      reporting,
       status: "warn",
       record,
       policy: "reject",
@@ -165,6 +174,7 @@ export function analyzeDmarc(
   if (subPolicy === "none" || subPolicy === "quarantine") {
     return {
       id: "dmarc-weak-subdomain",
+      reporting,
       status: "warn",
       record,
       policy: "reject",
@@ -178,6 +188,7 @@ export function analyzeDmarc(
 
   return {
     id: "dmarc-enforcing",
+    reporting,
     status: "pass",
     record,
     policy: "reject",
